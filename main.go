@@ -3,23 +3,18 @@ package main
 import (
 	"crypto/sha256"
 	"fmt"
-	"time"
 )
 
-// TODO: block hash
-// TODO: transaction validation (has user not yet voted etc.)
+/*
+TODO: transaction validation (has user not yet voted etc.)
+subtasks:
+- query to check whether a user has voted
+- store globals - node addresses,
+*/
 
-type Transaction struct {
-	// not storing issuer ID for privacy reasons (tokenId instead)
-	// not storing amount because it is always a single vote
-	tokenId string
-	toId    string
-}
-
-type Block struct {
-	timestamp    int
-	nonce        int
-	transactions []Transaction
+type Node struct {
+	address string
+	port    int
 }
 
 func calculateHash(block Block) string {
@@ -31,11 +26,23 @@ func calculateHash(block Block) string {
 
 func main() {
 	fmt.Println("Blockchain")
+
 	t1 := Transaction{tokenId: "qqqq-wwww-vvvv-aaaa", toId: "abc"}
 	t2 := Transaction{tokenId: "qqqq-wwww-vvvv-bbbb", toId: "abc"}
 
-	block1 := Block{timestamp: int(time.Now().Unix()), nonce: 0, transactions: []Transaction{t1, t2}}
+	blockchain := NewBlockchain(5)
 
-	fmt.Println(block1)
-	fmt.Println(calculateHash(block1))
+	blockchain.AddTransaction(t1)
+	blockchain.AddTransaction(t2)
+
+	// fmt.Println(block1.ProofOfWork(5))
+	// fmt.Println(block1.previousBlockHash)
+
+	fmt.Println(blockchain)
+	fmt.Println("Pending transactions")
+	fmt.Println(blockchain.pendingTransactions)
+
+	fmt.Println("After validation")
+	blockchain.ValidateTransactions()
+	fmt.Println(blockchain)
 }
