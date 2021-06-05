@@ -25,24 +25,21 @@ func calculateHash(block Block) string {
 }
 
 func main() {
-	fmt.Println("Blockchain")
-
 	t1 := Transaction{tokenId: "qqqq-wwww-vvvv-aaaa", toId: "abc"}
 	t2 := Transaction{tokenId: "qqqq-wwww-vvvv-bbbb", toId: "abc"}
 
-	blockchain := NewBlockchain(5)
+	blockchain := NewBlockchain(3)
 
 	blockchain.AddTransaction(t1)
 	blockchain.AddTransaction(t2)
 
-	// fmt.Println(block1.ProofOfWork(5))
-	// fmt.Println(block1.previousBlockHash)
+	// fmt.Println("Pending transactions")
+	// fmt.Println(blockchain.pendingTransactions)
 
-	fmt.Println(blockchain)
-	fmt.Println("Pending transactions")
-	fmt.Println(blockchain.pendingTransactions)
-
-	fmt.Println("After validation")
+	// fmt.Println("After validation")
 	blockchain.ValidateTransactions()
-	fmt.Println(blockchain)
+	// fmt.Println(blockchain.pendingTransactions)
+
+	// fmt.Println("Chain")
+	// fmt.Println(blockchain.chain)
 }
