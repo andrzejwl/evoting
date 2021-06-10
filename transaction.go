@@ -1,10 +1,12 @@
 package main
 
 type Transaction struct {
-	// not storing issuer ID for privacy reasons (tokenId instead)
-	// not storing amount because it is always a single vote
-	tokenId string
-	toId    string
+	/*
+		not storing issuer ID for privacy reasons (tokenId instead)
+		not storing amount because it is always a single vote
+	*/
+	TokenId string `json:"Token"`
+	ToId    string `json:"ToId"`
 }
 
 func validateTransaction(ta Transaction) (valid bool, err string) {

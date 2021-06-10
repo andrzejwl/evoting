@@ -1,15 +1,23 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"strings"
 )
 
 type Block struct {
-	timestamp         int
-	nonce             int
-	transactions      []Transaction
-	previousBlockHash string // chain
+	Timestamp         int           `json: "timestamp"`
+	Nonce             int           `json: "nonce"`
+	Transactions      []Transaction `json: "transactions"`
+	PreviousBlockHash string        `json: "previousHash"`
+}
+
+func calculateHash(block Block) string {
+	hash := sha256.New()
+	hash.Write([]byte(fmt.Sprint("%v", block)))
+
+	return fmt.Sprintf("%x", hash.Sum(nil)) // return string representing hex formatted hash
 }
 
 func (b *Block) ProofOfWork(difficulty int) string {
@@ -20,10 +28,10 @@ func (b *Block) ProofOfWork(difficulty int) string {
 	hash := calculateHash(*b)
 
 	for !strings.HasPrefix(hash, strings.Repeat("0", difficulty)) {
-		b.nonce += 1
+		b.Nonce += 1
 		hash = calculateHash(*b)
 	}
-	fmt.Println("nonce:", b.nonce, "hash:", hash, "block:", *b)
+
 	return hash
 }
 
@@ -35,10 +43,10 @@ func (b Block) AddTransaction(ta Transaction) {
 		return
 	}
 
-	b.transactions = append(b.transactions, ta)
+	b.Transactions = append(b.Transactions, ta)
 
 	// reset nonce when block changes
-	b.nonce = 0
+	b.Nonce = 0
 }
 
 func InitBlock() {

@@ -1,45 +1,52 @@
 package main
 
 import (
-	"crypto/sha256"
 	"fmt"
 )
 
 /*
 TODO: transaction validation (has user not yet voted etc.)
 subtasks:
-- query to check whether a user has voted
+- query to check whether a user has voted (outside of blockchain)
+- query to check if block exists on the chain (return index)
 - store globals - node addresses,
+- (?) thread responsible for achieving consensus
 */
 
-type Node struct {
-	address string
-	port    int
-}
-
-func calculateHash(block Block) string {
-	hash := sha256.New()
-	hash.Write([]byte(fmt.Sprint("%v", block)))
-
-	return fmt.Sprintf("%x", hash.Sum(nil)) // return string representing hex formatted hash
-}
+const blockchainDifficulty int = 3
 
 func main() {
-	t1 := Transaction{tokenId: "qqqq-wwww-vvvv-aaaa", toId: "abc"}
-	t2 := Transaction{tokenId: "qqqq-wwww-vvvv-bbbb", toId: "abc"}
+	allowedNodeAdresses := []Node{
+		Node{address: "127.0.0.1", port: 5000},
+		Node{address: "127.0.0.1", port: 5001},
+		Node{address: "127.0.0.1", port: 5002},
+	}
 
-	blockchain := NewBlockchain(3)
+	fmt.Println(allowedNodeAdresses)
+
+	t1 := Transaction{TokenId: "qqqq-wwww-vvvv-aaaa", ToId: "abc"}
+	t2 := Transaction{TokenId: "qqqq-wwww-vvvv-bbbb", ToId: "abc"}
+
+	blockchain := NewBlockchain(blockchainDifficulty)
 
 	blockchain.AddTransaction(t1)
 	blockchain.AddTransaction(t2)
-
-	// fmt.Println("Pending transactions")
-	// fmt.Println(blockchain.pendingTransactions)
-
-	// fmt.Println("After validation")
 	blockchain.ValidateTransactions()
-	// fmt.Println(blockchain.pendingTransactions)
 
-	// fmt.Println("Chain")
-	// fmt.Println(blockchain.chain)
+	t3 := Transaction{TokenId: "iiii-wwww-vvvv-aaaa", ToId: "abc"}
+	t4 := Transaction{TokenId: "jjjj-wwww-vvvv-bbbb", ToId: "abc"}
+	var bc2 = Blockchain(*blockchain)
+
+	bc2.AddTransaction(t3)
+	bc2.AddTransaction(t4)
+	bc2.ValidateTransactions()
+
+	fmt.Println("Before consensus:", blockchain.Chain)
+
+	blockchain.Consensus(bc2)
+
+	fmt.Println("After consensus:", blockchain.Chain)
+
+	fmt.Println("Starting HTTP server")
+	handleRequests(blockchain)
 }
