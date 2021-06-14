@@ -1,16 +1,17 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
 )
 
-func handleRequests(blockchain *Blockchain) {
+func handleRequests(port int, blockchain *Blockchain) {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/chain/", blockchain.HttpGetChain).Methods("GET")
 	r.HandleFunc("/transaction/create", blockchain.HttpCreateTransaction).Methods("POST")
-	log.Fatal(http.ListenAndServe(":5000", r))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", port), r))
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ type Blockchain struct {
 	Difficulty          int           `json:"difficulty"`
 	pendingTransactions []Transaction // no need to export this field
 	blockHashes         []string      // maintained so that hashes are not calculated all the time
+	peers               []Node
 }
 
 func NewBlockchain(difficulty int) *Blockchain {
@@ -54,8 +56,10 @@ func (bc *Blockchain) AddTransaction(t Transaction) string {
 
 func (bc *Blockchain) ValidateTransactions() {
 	// validate pending transactions and append them to the blockchain
-	lastBlock := bc.LastBlock()
+	bc.Update()
+
 	newBlock := Block{}
+	lastBlock := bc.LastBlock()
 
 	// use the commented way if validation is required
 
@@ -90,8 +94,23 @@ func (bc *Blockchain) HttpCreateTransaction(w http.ResponseWriter, r *http.Reque
 	}
 
 	bc.AddTransaction(t)
+	// in the future ValidateTransactions should not be called separately for each transaction
+	// might need to add a database to store the transactions in
 	bc.ValidateTransactions()
 	fmt.Fprint(w, json.NewEncoder(w).Encode(bc))
+}
+
+func (bc *Blockchain) HttpUpdate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	newChain, err := ReconstructBlockchain(r.Body)
+
+	if err != "" {
+		http.Error(w, err, http.StatusBadRequest)
+		return
+	}
+	bc.Consensus(newChain)
+	fmt.Fprint(w, json.NewEncoder(w).Encode("{\"detail\":\"ok\"}"))
 }
 
 func (bc Blockchain) IsValid() bool {
@@ -114,5 +133,40 @@ func (bc *Blockchain) Consensus(outsideChain Blockchain) {
 	if calculateHash(bc.GenesisBlock()) == calculateHash(outsideChain.GenesisBlock()) {
 		// genesis blocks are the same and outside chain is valid => bc is a subchain of the outside chain
 		bc.Chain = outsideChain.Chain
+	}
+}
+
+func ReconstructBlockchain(r io.ReadCloser) (Blockchain, string) {
+	var bc Blockchain
+	decodingErr := json.NewDecoder(r).Decode(&bc)
+
+	if decodingErr != nil {
+		return Blockchain{}, decodingErr.Error()
+	}
+
+	// fill this as blockHashes are not transmitted over network
+	for i, block := range bc.Chain {
+		bc.blockHashes[i] = calculateHash(block)
+	}
+
+	return bc, ""
+}
+
+func (bc *Blockchain) Update() {
+	// TODO: check if pending transactions have not already been validated and appended by other nodes
+	for _, peer := range bc.peers {
+		resp, err := http.Get(peer.String() + "/chain/")
+		if err != nil {
+			fmt.Println("[ERR] Peer chain check failed, skipping peer", peer)
+			continue
+		}
+
+		peerBc, reconstructErr := ReconstructBlockchain(resp.Body)
+		if reconstructErr != "" {
+			fmt.Println("[ERR] Peer chain check failed, skipping peer", peer)
+			continue
+		}
+
+		bc.Consensus(peerBc)
 	}
 }
