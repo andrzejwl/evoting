@@ -27,31 +27,43 @@ func RandomString(n int) string {
 	return string(s)
 }
 
+const DEBUG_MODE bool = false
+
 func main() {
 	// cli params
 	portPtr := flag.Int("port", 5000, "HTTP server port")
-	peerPtr := flag.String("peer", "127.0.0.1:5001", "Peer address")
+	rootPtr := flag.Bool("root", false, "Peer address")
+	typePtr := flag.String("type", "A", "[Debug]: A/B")
+	peerPortPtr := flag.Int("peer", 5001, "Localhost peer port flag")
 
 	flag.Parse()
-	fmt.Println(*portPtr, *peerPtr)
-
-	t1 := Transaction{TokenId: "qqqq-wwww-vvvv-aaaa", ToId: "abc"}
-	t2 := Transaction{TokenId: RandomString(16), ToId: RandomString(5)}
 
 	blockchain := NewBlockchain(blockchainDifficulty)
 
-	blockchain.peers = append(blockchain.peers,
-		Node{address: "127.0.0.1", port: 5000},
-		Node{address: "127.0.0.1", port: 5001},
-		Node{address: "127.0.0.1", port: 5002},
-	)
+	if !*rootPtr {
+		// not the "root" node - fetch existing chain from other peers
+		fmt.Println("Fetching chain from peers")
+		blockchain.peers = append(blockchain.peers,
+			Node{address: "127.0.0.1", port: *peerPortPtr},
+		)
+		blockchain.Update(true)
+	} else {
+		t1 := Transaction{TokenId: "qqqq-wwww-vvvv-aaaa", ToId: "abc"}
+		t2 := Transaction{TokenId: RandomString(16), ToId: RandomString(5)}
 
-	blockchain.AddTransaction(t1)
-	blockchain.AddTransaction(t2)
-	blockchain.ValidateTransactions()
+		blockchain.AddTransaction(t1)
+		blockchain.AddTransaction(t2)
+		blockchain.ValidateTransactions()
+	}
 
-	// t3 := Transaction{TokenId: "iiii-wwww-vvvv-aaaa", ToId: "abc"}
-	// t4 := Transaction{TokenId: "jjjj-wwww-vvvv-bbbb", ToId: "abc"}
+	if *typePtr == "B" {
+		t3 := Transaction{TokenId: "iiii-wwww-vvvv-aaaa", ToId: "abc"}
+		t4 := Transaction{TokenId: "jjjj-wwww-vvvv-bbbb", ToId: "abc"}
+
+		blockchain.AddTransaction(t3)
+		blockchain.AddTransaction(t4)
+		blockchain.ValidateTransactions()
+	}
 	// var bc2 = Blockchain(*blockchain)
 
 	// bc2.AddTransaction(t3)

@@ -18,7 +18,12 @@ type Blockchain struct {
 }
 
 func NewBlockchain(difficulty int) *Blockchain {
-	initBlock := Block{Timestamp: int(time.Now().Unix()), Nonce: 0, Transactions: []Transaction{}}
+	var initBlock Block
+	if DEBUG_MODE {
+		initBlock = Block{Timestamp: 0, Nonce: 0, Transactions: []Transaction{}}
+	} else {
+		initBlock = Block{Timestamp: int(time.Now().Unix()), Nonce: 0, Transactions: []Transaction{}}
+	}
 	initBlock.ProofOfWork(difficulty) // only solve the hash (modify nonce), no need to store its value
 
 	return &Blockchain{
@@ -56,7 +61,7 @@ func (bc *Blockchain) AddTransaction(t Transaction) string {
 
 func (bc *Blockchain) ValidateTransactions() {
 	// validate pending transactions and append them to the blockchain
-	bc.Update()
+	bc.Update(false)
 
 	newBlock := Block{}
 	lastBlock := bc.LastBlock()
@@ -72,7 +77,12 @@ func (bc *Blockchain) ValidateTransactions() {
 
 	bc.pendingTransactions = []Transaction{} // clear pending transactions
 	newBlock.PreviousBlockHash = calculateHash(lastBlock)
-	newBlock.Timestamp = int(time.Now().Unix())
+
+	if DEBUG_MODE {
+		newBlock.Timestamp = 0
+	} else {
+		newBlock.Timestamp = int(time.Now().Unix())
+	}
 	newBlock.ProofOfWork(bc.Difficulty)
 	bc.Chain = append(bc.Chain, newBlock)
 	bc.blockHashes = append(bc.blockHashes, calculateHash(newBlock))
@@ -80,6 +90,7 @@ func (bc *Blockchain) ValidateTransactions() {
 
 func (bc *Blockchain) HttpGetChain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	fmt.Println("GET /chain Request from:", r.RemoteAddr)
 	fmt.Fprint(w, json.NewEncoder(w).Encode(bc))
 }
 
@@ -145,19 +156,20 @@ func ReconstructBlockchain(r io.ReadCloser) (Blockchain, string) {
 	}
 
 	// fill this as blockHashes are not transmitted over network
-	for i, block := range bc.Chain {
-		bc.blockHashes[i] = calculateHash(block)
+	bc.blockHashes = nil // assert blockHashes is an empty slice
+	for _, block := range bc.Chain {
+		bc.blockHashes = append(bc.blockHashes, calculateHash(block))
 	}
 
 	return bc, ""
 }
 
-func (bc *Blockchain) Update() {
+func (bc *Blockchain) Update(initialize bool) {
 	// TODO: check if pending transactions have not already been validated and appended by other nodes
 	for _, peer := range bc.peers {
-		resp, err := http.Get(peer.String() + "/chain/")
+		resp, err := http.Get(fmt.Sprintf("http://%v/chain/", peer.String()))
 		if err != nil {
-			fmt.Println("[ERR] Peer chain check failed, skipping peer", peer)
+			fmt.Println("[ERR]", err, "Peer chain check failed, skipping peer", peer)
 			continue
 		}
 
@@ -166,7 +178,21 @@ func (bc *Blockchain) Update() {
 			fmt.Println("[ERR] Peer chain check failed, skipping peer", peer)
 			continue
 		}
-
-		bc.Consensus(peerBc)
+		if initialize {
+			bc.Chain = peerBc.Chain
+			bc.Difficulty = peerBc.Difficulty
+			fmt.Println("initialized", bc.Chain)
+		} else {
+			bc.Consensus(peerBc)
+		}
 	}
+}
+
+func (bc *Blockchain) HttpTriggerUpdate(w http.ResponseWriter, r *http.Request) {
+	/*
+		Temporary function used for debugging and testing.
+	*/
+	bc.Update(false)
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprint(w, "{\"detail\": \"ok\"}")
 }
