@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -86,6 +88,7 @@ func (bc *Blockchain) ValidateTransactions() {
 	newBlock.ProofOfWork(bc.Difficulty)
 	bc.Chain = append(bc.Chain, newBlock)
 	bc.blockHashes = append(bc.blockHashes, calculateHash(newBlock))
+	bc.PropagateChain()
 }
 
 func (bc *Blockchain) HttpGetChain(w http.ResponseWriter, r *http.Request) {
@@ -181,7 +184,6 @@ func (bc *Blockchain) Update(initialize bool) {
 		if initialize {
 			bc.Chain = peerBc.Chain
 			bc.Difficulty = peerBc.Difficulty
-			fmt.Println("initialized", bc.Chain)
 		} else {
 			bc.Consensus(peerBc)
 		}
@@ -195,4 +197,30 @@ func (bc *Blockchain) HttpTriggerUpdate(w http.ResponseWriter, r *http.Request) 
 	bc.Update(false)
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprint(w, "{\"detail\": \"ok\"}")
+}
+
+func (bc Blockchain) PropagateChain() {
+	bcBuffer, jsonErr := json.Marshal(bc)
+
+	if jsonErr != nil {
+		fmt.Println("[ERR] Chain encoding error", jsonErr.Error())
+		return
+	}
+
+	for _, peer := range bc.peers {
+		fmt.Println("Propagating to", peer)
+		resp, err := http.Post(fmt.Sprintf("http://%v/update", peer.String()), "application/json", bytes.NewBuffer(bcBuffer))
+
+		if err != nil {
+			fmt.Println("[ERR] Propagation failed to", peer, ", error:", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, respErr := ioutil.ReadAll(resp.Body)
+			if respErr != nil {
+				fmt.Println("[ERR]", respErr.Error())
+			}
+			fmt.Println("[ERR] Response from", peer, ": status code:", resp.StatusCode, ", response:", string(body))
+		}
+	}
 }
