@@ -1,19 +1,11 @@
 package main
 
 import (
+	"evoting/pow"
 	"flag"
 	"fmt"
 	"math/rand"
 )
-
-/*
-TODO: transaction validation (has user not yet voted etc.)
-subtasks:
-- propagate valid transactions before block is appended (so that other peers do not append new blocks)
-- query to check whether a user has voted (outside of blockchain)
-- store globals - node addresses,
-- (?) thread responsible for achieving consensus
-*/
 
 const blockchainDifficulty int = 3
 
@@ -27,55 +19,39 @@ func RandomString(n int) string {
 	return string(s)
 }
 
-const DEBUG_MODE bool = false
-
 func main() {
 	// cli params
 	portPtr := flag.Int("port", 5000, "HTTP server port")
-	rootPtr := flag.Bool("root", false, "Peer address")
-	typePtr := flag.String("type", "A", "[Debug]: A/B")
+	rootPtr := flag.Bool("root", false, "Is node the root node - initialize a new chain")
 	peerPortPtr := flag.Int("peer", 5001, "Localhost peer port flag")
+	consensusPtr := flag.String("consensus", "pow", "Consensus mechanism: pow / poa")
 
 	flag.Parse()
 
-	blockchain := NewBlockchain(blockchainDifficulty)
+	if *consensusPtr == "pow" {
+		// Proof of Work
+		blockchain := pow.NewBlockchain(blockchainDifficulty)
 
-	if !*rootPtr {
-		// not the "root" node - fetch existing chain from other peers
-		fmt.Println("Fetching chain from peers")
-		blockchain.peers = append(blockchain.peers,
-			Node{address: "127.0.0.1", port: *peerPortPtr},
-		)
-		blockchain.Update(true)
-	} else {
-		t1 := Transaction{TokenId: "qqqq-wwww-vvvv-aaaa", ToId: "abc"}
-		t2 := Transaction{TokenId: RandomString(16), ToId: RandomString(5)}
+		if !*rootPtr {
+			// not the "root" node - fetch existing chain from other peers
+			fmt.Println("Fetching chain from peers")
+			blockchain.Peers = append(blockchain.Peers,
+				pow.Node{Address: "127.0.0.1", Port: *peerPortPtr},
+			)
+			blockchain.Update(true)
+		} else if *consensusPtr == "poa" {
+			t1 := pow.Transaction{TokenId: "qqqq-wwww-vvvv-aaaa", ToId: "abc"}
+			t2 := pow.Transaction{TokenId: RandomString(16), ToId: RandomString(5)}
 
-		blockchain.AddTransaction(t1)
-		blockchain.AddTransaction(t2)
-		blockchain.ValidateTransactions()
+			blockchain.AddTransaction(t1)
+			blockchain.AddTransaction(t2)
+			blockchain.ValidateTransactions()
+		}
+
+		fmt.Println("Starting HTTP server on port", *portPtr)
+		pow.HandleRequests(*portPtr, blockchain)
+	} else if *consensusPtr == "poa" {
+		// Proof of Authority
+		fmt.Println("PoA")
 	}
-
-	if *typePtr == "B" {
-		t3 := Transaction{TokenId: "iiii-wwww-vvvv-aaaa", ToId: "abc"}
-		t4 := Transaction{TokenId: "jjjj-wwww-vvvv-bbbb", ToId: "abc"}
-
-		blockchain.AddTransaction(t3)
-		blockchain.AddTransaction(t4)
-		blockchain.ValidateTransactions()
-	}
-	// var bc2 = Blockchain(*blockchain)
-
-	// bc2.AddTransaction(t3)
-	// bc2.AddTransaction(t4)
-	// bc2.ValidateTransactions()
-
-	// fmt.Println("Before consensus:", blockchain.Chain)
-
-	// blockchain.Consensus(bc2)
-
-	// fmt.Println("After consensus:", blockchain.Chain)
-
-	fmt.Println("Starting HTTP server on port", *portPtr)
-	handleRequests(*portPtr, blockchain)
 }

@@ -1,4 +1,4 @@
-package main
+package pow
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func handleRequests(port int, blockchain *Blockchain) {
+func HandleRequests(port int, blockchain *Blockchain) {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/chain/", blockchain.HttpGetChain).Methods("GET")

@@ -1,4 +1,4 @@
-package main
+package pow
 
 import (
 	"bytes"
@@ -11,12 +11,14 @@ import (
 	"time"
 )
 
+const DEBUG_MODE bool = false // TODO: set this dynamically in main.go
+
 type Blockchain struct {
 	Chain               []Block       `json:"chain"`
 	Difficulty          int           `json:"difficulty"`
 	pendingTransactions []Transaction // no need to export this field
 	blockHashes         []string      // maintained so that hashes are not calculated all the time
-	peers               []Node
+	Peers               []Node        `json:"-"` // right now not shared but could be used to propagate new peers
 }
 
 func NewBlockchain(difficulty int) *Blockchain {
@@ -169,7 +171,7 @@ func ReconstructBlockchain(r io.ReadCloser) (Blockchain, string) {
 
 func (bc *Blockchain) Update(initialize bool) {
 	// TODO: check if pending transactions have not already been validated and appended by other nodes
-	for _, peer := range bc.peers {
+	for _, peer := range bc.Peers {
 		resp, err := http.Get(fmt.Sprintf("http://%v/chain/", peer.String()))
 		if err != nil {
 			fmt.Println("[ERR]", err, "Peer chain check failed, skipping peer", peer)
@@ -207,7 +209,7 @@ func (bc Blockchain) PropagateChain() {
 		return
 	}
 
-	for _, peer := range bc.peers {
+	for _, peer := range bc.Peers {
 		fmt.Println("Propagating to", peer)
 		resp, err := http.Post(fmt.Sprintf("http://%v/update", peer.String()), "application/json", bytes.NewBuffer(bcBuffer))
 

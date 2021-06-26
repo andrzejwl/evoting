@@ -1,4 +1,4 @@
-package main
+package pow
 
 type Transaction struct {
 	/*
