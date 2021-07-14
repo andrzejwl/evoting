@@ -1,6 +1,7 @@
 package main
 
 import (
+	"evoting/pbft"
 	"evoting/pow"
 	"flag"
 	"fmt"
@@ -24,7 +25,7 @@ func main() {
 	portPtr := flag.Int("port", 5000, "HTTP server port")
 	rootPtr := flag.Bool("root", false, "Is node the root node - initialize a new chain")
 	peerPortPtr := flag.Int("peer", 5001, "Localhost peer port flag")
-	consensusPtr := flag.String("consensus", "pow", "Consensus mechanism: pow / poa")
+	consensusPtr := flag.String("consensus", "pow", "Consensus mechanism: pow / poa / pbft")
 
 	flag.Parse()
 
@@ -39,7 +40,7 @@ func main() {
 				pow.Node{Address: "127.0.0.1", Port: *peerPortPtr},
 			)
 			blockchain.Update(true)
-		} else if *consensusPtr == "poa" {
+		} else {
 			t1 := pow.Transaction{TokenId: "qqqq-wwww-vvvv-aaaa", ToId: "abc"}
 			t2 := pow.Transaction{TokenId: RandomString(16), ToId: RandomString(5)}
 
@@ -53,5 +54,10 @@ func main() {
 	} else if *consensusPtr == "poa" {
 		// Proof of Authority
 		fmt.Println("PoA")
+	} else if *consensusPtr == "pbft" {
+		// Practical Byzantine Fault Tolerance
+		fmt.Println("PBFT")
+		blockchain := pbft.NewBlockchain()
+		pbft.HandleRequests(*portPtr, blockchain)
 	}
 }
