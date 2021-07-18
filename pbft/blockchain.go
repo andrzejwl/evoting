@@ -88,6 +88,12 @@ func (bc Blockchain) PropagateMessage(endpoint string, message interface{}) bool
 	return true
 }
 
+func (bc *Blockchain) HttpGetChain(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Println("GET /chain Request from:", r.RemoteAddr)
+	fmt.Fprint(w, json.NewEncoder(w).Encode(bc))
+}
+
 func (bc Blockchain) HttpRequest(w http.ResponseWriter, r *http.Request) {
 	// PBFT: Request Phase
 	// Node receives transaction data from a client (and thus becomes the "primary replica").
@@ -101,7 +107,7 @@ func (bc Blockchain) HttpRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, HttpJsonBodyPadding(error.Error()), http.StatusBadRequest)
 		return
 	}
-	transactionsJson, encodingErr := json.Marshal(transactions)
+	_, encodingErr := json.Marshal(transactions)
 
 	if encodingErr != nil {
 		http.Error(w, HttpJsonBodyPadding(error.Error()), http.StatusBadRequest)
@@ -115,7 +121,7 @@ func (bc Blockchain) HttpRequest(w http.ResponseWriter, r *http.Request) {
 
 	success := bc.PropagateMessage("pre-prepare", newBlock)
 	if success {
-		fmt.Fprint(w, json.NewEncoder(w).Encode(HttpJsonBodyPadding(string(transactionsJson))))
+		fmt.Fprint(w, json.NewEncoder(w).Encode(newBlock))
 	} else {
 		http.Error(w, HttpJsonBodyPadding("node connection error"), http.StatusBadRequest)
 	}

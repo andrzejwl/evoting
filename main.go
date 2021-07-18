@@ -58,6 +58,7 @@ func main() {
 		// Practical Byzantine Fault Tolerance
 		fmt.Println("PBFT")
 		blockchain := pbft.NewBlockchain()
+		fmt.Println("Starting HTTP server on port", *portPtr)
 		pbft.HandleRequests(*portPtr, blockchain)
 	}
 }

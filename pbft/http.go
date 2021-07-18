@@ -13,7 +13,7 @@ func HandleRequests(port int, blockchain *Blockchain) {
 
 	r.HandleFunc("/pre-prepare", blockchain.HttpPrePrepare).Methods("POST")
 	r.HandleFunc("/prepare", blockchain.HttpPrepare).Methods("POST")
-	// r.HandleFunc("/chain", blockchain.HttpGetChain).Methods("GET")
+	r.HandleFunc("/chain", blockchain.HttpGetChain).Methods("GET")
 	// r.HandleFunc("/transaction/create", blockchain.HttpCreateTransaction).Methods("POST")
 	// r.HandleFunc("/update", blockchain.HttpUpdate).Methods("POST")
 	// r.HandleFunc("/debug/update", blockchain.HttpTriggerUpdate).Methods("GET")
