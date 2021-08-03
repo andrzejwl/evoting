@@ -3,9 +3,9 @@ package pbft
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 	"time"
@@ -20,8 +20,8 @@ type Request struct {
 }
 
 type Commit struct {
-	from    string `json:"node-id"`
-	blockId int    `json:"block-id"`
+	From    string `json:"node-id"`
+	BlockId int    `json:"block-id"`
 }
 
 type PendingRequests struct {
@@ -47,10 +47,12 @@ func (pending PendingRequests) SelectPrimaryReplica() Node {
 	return pending.nodes[n]
 }
 
-func HttpHandler(port int, pendingRequests *PendingRequests) {
+func (pending *PendingRequests) HttpHandler(port int) {
 	r := mux.NewRouter()
-	r.HandleFunc("/commit", pendingRequests.ReceiveCommitInfo).Methods("POST")
-	r.HandleFunc("/new-request", pendingRequests.CreateRequest).Methods("POST")
+	r.HandleFunc("/commit", pending.ReceiveCommitInfo).Methods("POST")
+	r.HandleFunc("/new-request", pending.CreateRequest).Methods("POST")
+
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", port), r))
 }
 
 func (pendingRequests *PendingRequests) ReceiveCommitInfo(w http.ResponseWriter, r *http.Request) {
@@ -62,13 +64,13 @@ func (pendingRequests *PendingRequests) ReceiveCommitInfo(w http.ResponseWriter,
 		return
 	}
 
-	commits := pendingRequests.requests[newCommit.blockId]
+	commits := pendingRequests.requests[newCommit.BlockId]
 	commits = append(commits, newCommit)
-	pendingRequests.requests[newCommit.blockId] = commits
+	pendingRequests.requests[newCommit.BlockId] = commits
 
 	f := pendingRequests.MaximumFaultyNodes()
-	if len(pendingRequests.requests[newCommit.blockId]) > f {
-		delete(pendingRequests.requests, newCommit.blockId)
+	if len(pendingRequests.requests[newCommit.BlockId]) > f {
+		delete(pendingRequests.requests, newCommit.BlockId)
 		// maybe notify the web server about successful request submission
 	}
 }
@@ -97,6 +99,7 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 	response, httpErr := http.Post(fmt.Sprintf("http://%v/request", node.String()), "application/json", bytes.NewBuffer(bodyBuffer))
 	if httpErr != nil {
 		http.Error(w, HttpJsonBodyPadding("failed to connect to blockchain"), http.StatusBadRequest)
+		return
 	}
 
 	if response.StatusCode != 200 {
@@ -116,11 +119,9 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 	fmt.Fprint(w, json.NewEncoder(w).Encode(HttpJsonBodyPadding("request submitted to the blockchain")))
 }
 
-func StartClient() {
-	portPtr := flag.Int("port", 3333, "HTTP server port")
-
+func StartClient(httpPort int) {
 	var pending PendingRequests
 
 	fmt.Println("[CLIENT] Starting HTTP Listener")
-	HttpHandler(*portPtr, &pending)
+	pending.HttpHandler(httpPort)
 }

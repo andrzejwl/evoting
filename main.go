@@ -22,12 +22,18 @@ func RandomString(n int) string {
 
 func main() {
 	// cli params
+	clientPtr := flag.Bool("client_mode", false, "run client mode (middleman between web app and blockchain)")
 	portPtr := flag.Int("port", 5000, "HTTP server port")
 	rootPtr := flag.Bool("root", false, "Is node the root node - initialize a new chain")
 	peerPortPtr := flag.Int("peer", 5001, "Localhost peer port flag")
 	consensusPtr := flag.String("consensus", "pow", "Consensus mechanism: pow / poa / pbft")
 
 	flag.Parse()
+
+	if *clientPtr {
+		pbft.StartClient(*portPtr)
+		return
+	}
 
 	if *consensusPtr == "pow" {
 		// Proof of Work
