@@ -15,9 +15,10 @@ import (
 )
 
 type Node struct {
-	Address string `json:"address"`
-	Port    int    `json:"port"`
-	Type    string `json:"node-type"`
+	Address    string `json:"address"`
+	Port       int    `json:"port"`
+	Type       string `json:"node-type"`
+	Identifier string `json:"node-id"`
 }
 
 func (n Node) String() string {
@@ -29,29 +30,35 @@ type NodeDiscovery struct {
 	ClientNodes     []Node
 }
 
-func (nd NodeDiscovery) HttpGetAllNodes(w http.ResponseWriter, r *http.Request) {
+func NewDiscovery() *NodeDiscovery {
+	var nd NodeDiscovery
+	return &nd
+}
+
+func (nd *NodeDiscovery) HttpGetAllNodes(w http.ResponseWriter, r *http.Request) {
 	var all []Node
 	all = append(all, nd.BlockchainNodes...)
 	all = append(all, nd.ClientNodes...)
+	fmt.Println(nd.BlockchainNodes)
 	fmt.Fprint(w, json.NewEncoder(w).Encode(all))
 }
 
-func (nd NodeDiscovery) HttpGetBlockchain(w http.ResponseWriter, r *http.Request) {
+func (nd *NodeDiscovery) HttpGetBlockchain(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, json.NewEncoder(w).Encode(nd.BlockchainNodes))
 }
 
-func (nd NodeDiscovery) HttpGetClients(w http.ResponseWriter, r *http.Request) {
+func (nd *NodeDiscovery) HttpGetClients(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, json.NewEncoder(w).Encode(nd.ClientNodes))
 }
 
 func ContentTypeMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		next.ServeHTTP(w, r)
 	})
 }
 
 func (nd *NodeDiscovery) HttpRegisterNode(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("register")
 	var newNode Node
 	decodingErr := json.NewDecoder(r.Body).Decode(&newNode)
 	if decodingErr != nil {
@@ -68,7 +75,9 @@ func (nd *NodeDiscovery) HttpRegisterNode(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	fmt.Fprint(w, []byte("{\"detail\": \"ok\"}"))
+	fmt.Println(nd.BlockchainNodes)
+
+	fmt.Fprint(w, json.NewEncoder(w).Encode("{\"detail\":\"ok\"}"))
 }
 
 func HandleRequests(port int, nd *NodeDiscovery) {
@@ -84,9 +93,9 @@ func HandleRequests(port int, nd *NodeDiscovery) {
 }
 
 func main() {
-	var nd NodeDiscovery
+	nd := NewDiscovery()
 	portPtr := flag.Int("port", 9999, "HTTP listener port")
 
 	fmt.Println("[Node Discovery] Starting HTTP Listener on port", *portPtr)
-	HandleRequests(*portPtr, &nd)
+	HandleRequests(*portPtr, nd)
 }
