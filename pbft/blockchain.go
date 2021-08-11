@@ -11,18 +11,27 @@ import (
 )
 
 type Blockchain struct {
-	Chain       []Block        `json:"chain"`
-	Peers       []Node         `json:"-"` // right now not shared but could be used to propagate new peers
-	Votings     map[int]Voting `json:"-"` // key - block ID
-	Identifier  string         `json:"node-id"`
-	BlockBuffer map[int]Block  `json:"-"`
+	Chain            []Block        `json:"chain"`
+	Peers            []Node         `json:"-"` // right now not shared but could be used to propagate new peers
+	Votings          map[int]Voting `json:"-"` // key - block ID
+	Identifier       string         `json:"node-id"`
+	BlockBuffer      map[int]Block  `json:"-"`
+	DiscoveryAddress string         `json:"-"`
+	Self             Node           `json: "-"`
 }
 
-func NewBlockchain() *Blockchain {
+func NewBlockchain(port int) *Blockchain {
 	initBlock := Block{Identifier: 0, Timestamp: int(time.Now().Unix()), PreviousBlockHash: ""}
 	var bc Blockchain
 	bc.Chain = append(bc.Chain, initBlock)
 	bc.Identifier = uuid.NewString()
+	bc.DiscoveryAddress = "127.0.0.1:9999"
+
+	self := Node{"127.0.0.1", port, bc.Identifier}
+	bc.Self = self
+
+	bc.RegisterNode()
+
 	return &bc
 }
 
@@ -30,6 +39,15 @@ func (bc Blockchain) MaximumFaultyNodes() int {
 	// Max faulty nodes for PBFT is floor((n-1)/3).
 
 	return int(len(bc.Peers) / 3) // peers + self = n
+}
+
+func (bc Blockchain) RegisterNode() {
+	messageBuffer, _ := json.Marshal(bc.Self)
+	resp, err := http.Post(fmt.Sprintf("http://%v/get-blockchain", bc.DiscoveryAddress), "application/json", bytes.NewBuffer(messageBuffer))
+
+	if err != nil || resp.StatusCode != 200 {
+		fmt.Println("[ERROR] failed to register node at node discovery service")
+	}
 }
 
 func (bc Blockchain) LastBlock() Block {
@@ -64,7 +82,26 @@ func (bc *Blockchain) InsertVote(vote VoteRequest) {
 	bc.Votings[voting.blockId] = voting
 }
 
-func (bc Blockchain) PropagateMessage(endpoint string, message interface{}) bool {
+func (bc *Blockchain) RefreshPeers() {
+	var newPeers []Node
+	resp, err := http.Get(fmt.Sprintf("http://%v/get-blockchain", bc.DiscoveryAddress))
+
+	if err != nil {
+		fmt.Println("[CLIENT] failed to refresh nodes")
+		return
+	}
+
+	decodingErr := json.NewDecoder(resp.Body).Decode(&newPeers)
+
+	if decodingErr != nil {
+		fmt.Println("[ERROR] node discovery's response is ambiguous")
+		return
+	}
+
+	bc.Peers = newPeers
+}
+
+func (bc *Blockchain) PropagateMessage(endpoint string, message interface{}) bool {
 	// Makes an HTTP post request to all discovered peers.
 	// Returns true if propagation was successful, else false.
 
@@ -75,6 +112,8 @@ func (bc Blockchain) PropagateMessage(endpoint string, message interface{}) bool
 	}
 
 	failedCtr := 0
+
+	bc.RefreshPeers()
 
 	for _, peer := range bc.Peers {
 		_, err := http.Post(fmt.Sprintf("http://%v/%v", peer.String(), endpoint), "application/json", bytes.NewBuffer(messageBuffer))

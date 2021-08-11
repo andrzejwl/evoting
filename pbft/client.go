@@ -25,8 +25,9 @@ type Commit struct {
 }
 
 type PendingRequests struct {
-	requests map[int][]Commit // blockId -> slice containing all commits to a block
-	nodes    []Node
+	requests         map[int][]Commit // blockId -> slice containing all commits to a block
+	nodes            []Node
+	discoveryAddress string
 }
 
 func (pending PendingRequests) MaximumFaultyNodes() int {
@@ -34,6 +35,25 @@ func (pending PendingRequests) MaximumFaultyNodes() int {
 	// slight change compared to the same method in Blockchain struct - not counting self to n
 
 	return int((len(pending.nodes) - 1) / 3)
+}
+
+func (pending *PendingRequests) RefreshNodes() {
+	var newNodes []Node
+	resp, err := http.Get(fmt.Sprintf("http://%v/get-blockchain", pending.discoveryAddress))
+
+	if err != nil {
+		fmt.Println("[CLIENT] failed to refresh nodes")
+		return
+	}
+
+	decodingErr := json.NewDecoder(resp.Body).Decode(&newNodes)
+
+	if decodingErr != nil {
+		fmt.Println("[CLIENT] node discovery's response is ambiguous")
+		return
+	}
+
+	pending.nodes = newNodes
 }
 
 func (pending PendingRequests) SelectPrimaryReplica() Node {
@@ -121,6 +141,7 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 
 func StartClient(httpPort int) {
 	var pending PendingRequests
+	pending.discoveryAddress = "127.0.0.1:9999"
 
 	fmt.Println("[CLIENT] Starting HTTP Listener")
 	pending.HttpHandler(httpPort)

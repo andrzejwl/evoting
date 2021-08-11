@@ -63,7 +63,7 @@ func main() {
 	} else if *consensusPtr == "pbft" {
 		// Practical Byzantine Fault Tolerance
 		fmt.Println("PBFT")
-		blockchain := pbft.NewBlockchain()
+		blockchain := pbft.NewBlockchain(*portPtr)
 		fmt.Println("Starting HTTP server on port", *portPtr)
 		pbft.HandleRequests(*portPtr, blockchain)
 	}
