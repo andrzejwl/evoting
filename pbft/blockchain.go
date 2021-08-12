@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -17,22 +19,59 @@ type Blockchain struct {
 	Identifier       string         `json:"node-id"`
 	BlockBuffer      map[int]Block  `json:"-"`
 	DiscoveryAddress string         `json:"-"`
-	Self             Node           `json: "-"`
+	Self             Node           `json:"-"`
 }
 
 func NewBlockchain(port int) *Blockchain {
-	initBlock := Block{Identifier: 0, Timestamp: int(time.Now().Unix()), PreviousBlockHash: ""}
 	var bc Blockchain
-	bc.Chain = append(bc.Chain, initBlock)
 	bc.Identifier = uuid.NewString()
 	bc.DiscoveryAddress = "127.0.0.1:9999"
+	bc.Votings = make(map[int]Voting)
+	bc.BlockBuffer = make(map[int]Block)
 
-	self := Node{"127.0.0.1", port, bc.Identifier}
+	self := Node{"127.0.0.1", port, bc.Identifier, "blockchain"}
 	bc.Self = self
 
 	bc.RegisterNode()
 
+	bc.RefreshPeers()
+	if len(bc.Peers) < 2 {
+		// create genesis block
+		initBlock := Block{Identifier: 0, Timestamp: int(time.Now().Unix()), Transactions: []Transaction{}, PreviousBlockHash: ""}
+		bc.Chain = append(bc.Chain, initBlock)
+	} else {
+		// fetch blockchain from a random peer
+		peer := RandomNode(bc.Peers)
+
+		// prevent asking self for the current chain
+		for peer.Address == bc.Self.Address && peer.Port == bc.Self.Port {
+			peer = RandomNode(bc.Peers)
+		}
+
+		resp, error := http.Get(fmt.Sprintf("http://%v/chain", peer))
+		if error != nil {
+			fmt.Printf("[ERROR] failed to fetch blockchain data from %v", peer)
+		} else {
+			newChain, decodingErr := ReconstructBlockchain(resp.Body)
+			if decodingErr != "" {
+				fmt.Println("[ERROR] erroring parsing peer blockchain:", decodingErr)
+			}
+			bc.Chain = newChain.Chain
+		}
+	}
+
 	return &bc
+}
+
+func ReconstructBlockchain(r io.ReadCloser) (Blockchain, string) {
+	var bc Blockchain
+	decodingErr := json.NewDecoder(r).Decode(&bc)
+
+	if decodingErr != nil {
+		return Blockchain{}, decodingErr.Error()
+	}
+
+	return bc, ""
 }
 
 func (bc Blockchain) MaximumFaultyNodes() int {
@@ -43,10 +82,18 @@ func (bc Blockchain) MaximumFaultyNodes() int {
 
 func (bc Blockchain) RegisterNode() {
 	messageBuffer, _ := json.Marshal(bc.Self)
-	resp, err := http.Post(fmt.Sprintf("http://%v/get-blockchain", bc.DiscoveryAddress), "application/json", bytes.NewBuffer(messageBuffer))
+	resp, err := http.Post(fmt.Sprintf("http://%v/register", bc.DiscoveryAddress), "application/json", bytes.NewBuffer(messageBuffer))
 
 	if err != nil || resp.StatusCode != 200 {
 		fmt.Println("[ERROR] failed to register node at node discovery service")
+		if err != nil {
+			fmt.Println("details:", err.Error())
+		} else {
+			bodyBytes, _ := ioutil.ReadAll(resp.Body)
+			fmt.Println("status code:", resp.StatusCode, ", discovery response:", string(bodyBytes))
+		}
+	} else {
+		fmt.Println("[INFO] Node registered")
 	}
 }
 

@@ -57,9 +57,6 @@ func main() {
 
 		fmt.Println("Starting HTTP server on port", *portPtr)
 		pow.HandleRequests(*portPtr, blockchain)
-	} else if *consensusPtr == "poa" {
-		// Proof of Authority
-		fmt.Println("PoA")
 	} else if *consensusPtr == "pbft" {
 		// Practical Byzantine Fault Tolerance
 		fmt.Println("PBFT")

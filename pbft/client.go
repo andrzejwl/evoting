@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
@@ -28,6 +29,7 @@ type PendingRequests struct {
 	requests         map[int][]Commit // blockId -> slice containing all commits to a block
 	nodes            []Node
 	discoveryAddress string
+	self             Node
 }
 
 func (pending PendingRequests) MaximumFaultyNodes() int {
@@ -35,6 +37,26 @@ func (pending PendingRequests) MaximumFaultyNodes() int {
 	// slight change compared to the same method in Blockchain struct - not counting self to n
 
 	return int((len(pending.nodes) - 1) / 3)
+}
+
+func (pending PendingRequests) RegisterNode(addr string, port int, idnt string) {
+	self := Node{Address: addr, Port: port, Identifier: idnt, Type: "client"}
+	pending.self = self
+
+	messageBuffer, _ := json.Marshal(pending.self)
+	resp, err := http.Post(fmt.Sprintf("http://%v/register", pending.discoveryAddress), "application/json", bytes.NewBuffer(messageBuffer))
+
+	if err != nil || resp.StatusCode != 200 {
+		fmt.Println("[ERROR] failed to register node at node discovery service")
+		if err != nil {
+			fmt.Println("details:", err.Error())
+		} else {
+			bodyBytes, _ := ioutil.ReadAll(resp.Body)
+			fmt.Println("status code:", resp.StatusCode, ", discovery response:", string(bodyBytes))
+		}
+	} else {
+		fmt.Println("[INFO] Node registered")
+	}
 }
 
 func (pending *PendingRequests) RefreshNodes() {
@@ -114,7 +136,9 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 	}
 
 	// get new primary replica
+	pendingRequests.RefreshNodes()
 	node := pendingRequests.SelectPrimaryReplica()
+	fmt.Println("[DEBUG] primary replica:", node.Identifier)
 
 	response, httpErr := http.Post(fmt.Sprintf("http://%v/request", node.String()), "application/json", bytes.NewBuffer(bodyBuffer))
 	if httpErr != nil {
@@ -142,7 +166,7 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 func StartClient(httpPort int) {
 	var pending PendingRequests
 	pending.discoveryAddress = "127.0.0.1:9999"
-
+	pending.RegisterNode("127.0.0.1", httpPort, uuid.NewString())
 	fmt.Println("[CLIENT] Starting HTTP Listener")
 	pending.HttpHandler(httpPort)
 }

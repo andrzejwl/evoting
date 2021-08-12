@@ -2,6 +2,8 @@ package pbft
 
 import (
 	"fmt"
+	"math/rand"
+	"time"
 )
 
 type StandardResponse struct {
@@ -11,4 +13,10 @@ type StandardResponse struct {
 func HttpJsonBodyPadding(message string) string {
 	body := fmt.Sprintf("{\"detail\": \"%v\"}", message)
 	return body
+}
+
+func RandomNode(nodes []Node) Node {
+	rand.Seed(time.Now().Unix())
+	n := rand.Int() % len(nodes)
+	return nodes[n]
 }

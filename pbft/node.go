@@ -3,9 +3,10 @@ package pbft
 import "fmt"
 
 type Node struct {
-	Address    string
-	Port       int
-	Identifier string
+	Address    string `json:"address"`
+	Port       int    `json:"port"`
+	Identifier string `json:"node-id"`
+	Type       string `json:"node-type"`
 }
 
 func (n Node) String() string {
