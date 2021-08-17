@@ -1,4 +1,4 @@
-module evoting/pbft
+module evoting
 
 go 1.13
 

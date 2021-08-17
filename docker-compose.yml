@@ -1,0 +1,27 @@
+version: "3.9"
+services:
+  node-discovery:
+    build: ./node_discovery/
+    ports:
+      - 9999:9999
+  node-1:
+    build: .
+    ports:
+      - 1337:1337
+    depends_on: 
+      - node-discovery
+  node-2:
+    build: .
+    ports:
+      - 1338:1338
+    depends_on: 
+      - node-discovery
+    # entrypoint changed so that ports remain the same as on localhost
+    entrypoint: ["/evoting", "-consensus=pbft", "-port=1338"]
+  client-1:
+    build: .
+    ports:
+      - 2001:2001
+    depends_on: 
+      - node-discovery
+    entrypoint: ["/evoting", "-client_mode=true", "-port=2001"]
