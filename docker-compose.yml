@@ -10,6 +10,9 @@ services:
       - 1337:1337
     depends_on: 
       - node-discovery
+    environment: 
+      - HOSTNAME=node-1
+      - DISCOVERY_ADDR=node-discovery:9999
   node-2:
     build: .
     ports:
@@ -18,6 +21,9 @@ services:
       - node-discovery
     # entrypoint changed so that ports remain the same as on localhost
     entrypoint: ["/evoting", "-consensus=pbft", "-port=1338"]
+    environment: 
+      - HOSTNAME=node-2
+      - DISCOVERY_ADDR=node-discovery:9999
   client-1:
     build: .
     ports:
@@ -25,3 +31,6 @@ services:
     depends_on: 
       - node-discovery
     entrypoint: ["/evoting", "-client_mode=true", "-port=2001"]
+    environment: 
+      - HOSTNAME=client-1
+      - DISCOVERY_ADDR=node-discovery:9999

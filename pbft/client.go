@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -165,8 +166,8 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 
 func StartClient(httpPort int) {
 	var pending PendingRequests
-	pending.discoveryAddress = "127.0.0.1:9999"
-	pending.RegisterNode("127.0.0.1", httpPort, uuid.NewString())
+	pending.discoveryAddress = os.Getenv("DISCOVERY_ADDR")
+	pending.RegisterNode(os.Getenv("HOSTNAME"), httpPort, uuid.NewString())
 	fmt.Println("[CLIENT] Starting HTTP Listener")
 	pending.HttpHandler(httpPort)
 }

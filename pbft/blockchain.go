@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,11 +26,13 @@ type Blockchain struct {
 func NewBlockchain(port int) *Blockchain {
 	var bc Blockchain
 	bc.Identifier = uuid.NewString()
-	bc.DiscoveryAddress = "127.0.0.1:9999"
+	bc.DiscoveryAddress = os.Getenv("DISCOVERY_ADDR")
 	bc.Votings = make(map[int]Voting)
 	bc.BlockBuffer = make(map[int]Block)
 
-	self := Node{"127.0.0.1", port, bc.Identifier, "blockchain"}
+	hostname := os.Getenv("HOSTNAME")
+
+	self := Node{hostname, port, bc.Identifier, "blockchain"}
 	bc.Self = self
 
 	bc.RegisterNode()
