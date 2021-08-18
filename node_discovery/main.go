@@ -73,7 +73,7 @@ func (nd *NodeDiscovery) HttpRegisterNode(w http.ResponseWriter, r *http.Request
 		http.Error(w, "{\"detail\": \"incorrect node type\"}", http.StatusBadRequest)
 		return
 	}
-
+	fmt.Println("[INFO] New peer registered", newNode)
 	fmt.Fprint(w, json.NewEncoder(w).Encode("{\"detail\":\"ok\"}"))
 }
 
