@@ -39,7 +39,6 @@ func (nd *NodeDiscovery) HttpGetAllNodes(w http.ResponseWriter, r *http.Request)
 	var all []Node
 	all = append(all, nd.BlockchainNodes...)
 	all = append(all, nd.ClientNodes...)
-	fmt.Println(nd.BlockchainNodes)
 	fmt.Fprint(w, json.NewEncoder(w).Encode(all))
 }
 
@@ -74,8 +73,6 @@ func (nd *NodeDiscovery) HttpRegisterNode(w http.ResponseWriter, r *http.Request
 		http.Error(w, "{\"detail\": \"incorrect node type\"}", http.StatusBadRequest)
 		return
 	}
-
-	fmt.Println(nd.BlockchainNodes)
 
 	fmt.Fprint(w, json.NewEncoder(w).Encode("{\"detail\":\"ok\"}"))
 }

@@ -19,6 +19,7 @@ services:
       - 1338:1338
     depends_on: 
       - node-discovery
+      - node-1
     # entrypoint changed so that ports remain the same as on localhost
     entrypoint: ["/evoting", "-consensus=pbft", "-port=1338"]
     environment: 
