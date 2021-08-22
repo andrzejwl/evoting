@@ -1,11 +1,13 @@
 version: "3.9"
 services:
   node-discovery:
-    build: ./node_discovery/
+    # build image with "docker build --tag evoting_node-discovery ./node_discovery"
+    image: "evoting_node-discovery"
     ports:
       - 9999:9999
   node-1:
-    build: .
+    # build image with "docker build --tag evoting_node ."
+    image: "evoting_node"
     ports:
       - 1337:1337
     depends_on: 
@@ -14,7 +16,7 @@ services:
       - HOSTNAME=node-1
       - DISCOVERY_ADDR=node-discovery:9999
   node-2:
-    build: .
+    image: "evoting_node"
     ports:
       - 1338:1338
     depends_on: 
@@ -26,7 +28,7 @@ services:
       - HOSTNAME=node-2
       - DISCOVERY_ADDR=node-discovery:9999
   client-1:
-    build: .
+    image: "evoting_node"
     ports:
       - 2001:2001
     depends_on: 
