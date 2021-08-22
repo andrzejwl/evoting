@@ -59,7 +59,6 @@ func main() {
 		pow.HandleRequests(*portPtr, blockchain)
 	} else if *consensusPtr == "pbft" {
 		// Practical Byzantine Fault Tolerance
-		fmt.Println("PBFT")
 		blockchain := pbft.NewBlockchain(*portPtr)
 		fmt.Println("Starting HTTP server on port", *portPtr)
 		pbft.HandleRequests(*portPtr, blockchain)

@@ -15,6 +15,7 @@ func HandleRequests(port int, blockchain *Blockchain) {
 	r.HandleFunc("/prepare", blockchain.HttpPrepare).Methods("POST")
 	r.HandleFunc("/chain", blockchain.HttpGetChain).Methods("GET")
 	r.HandleFunc("/request", blockchain.HttpRequest).Methods("POST")
+	r.HandleFunc("/pending", blockchain.HttpGetPending).Methods("GET")
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", port), r))
 }

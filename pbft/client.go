@@ -19,6 +19,7 @@ import (
 
 type Request struct {
 	Transactions []Transaction `json:"transactions"`
+	Client       Node          `json:"requesting-client"`
 }
 
 type Commit struct {
@@ -122,14 +123,17 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 	// TODO: perhaps validate if the request is coming from a trusted party?
 
 	w.Header().Set("Content-Type", "application/json")
+
 	var request Request
+	request.Client = pendingRequests.self
+
 	error := json.NewDecoder(r.Body).Decode(&request)
 	if error != nil {
 		http.Error(w, HttpJsonBodyPadding("incorrect request body"), http.StatusBadRequest)
 		return
 	}
 
-	bodyBuffer, bufferErr := json.Marshal(request.Transactions)
+	bodyBuffer, bufferErr := json.Marshal(request)
 
 	if bufferErr != nil {
 		http.Error(w, HttpJsonBodyPadding("incorrect request body"), http.StatusBadRequest)
@@ -167,7 +171,8 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 func StartClient(httpPort int) {
 	var pending PendingRequests
 	pending.discoveryAddress = os.Getenv("DISCOVERY_ADDR")
-	pending.RegisterNode(os.Getenv("HOSTNAME"), httpPort, uuid.NewString())
+	pending.self = Node{os.Getenv("HOSTNAME"), httpPort, uuid.NewString(), "client"}
+	pending.RegisterNode(pending.self.Address, pending.self.Port, pending.self.Identifier)
 	fmt.Println("[CLIENT] Starting HTTP Listener")
 	pending.HttpHandler(httpPort)
 }

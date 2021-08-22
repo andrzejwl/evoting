@@ -6,10 +6,10 @@ import (
 )
 
 type Block struct {
-	Identifier        int           `json: "id"`
-	Timestamp         int           `json: "timestamp"`
-	Transactions      []Transaction `json: "transactions"`
-	PreviousBlockHash string        `json: "previousHash"`
+	Identifier        int           `json:"id"`
+	Timestamp         int           `json:"timestamp"`
+	Transactions      []Transaction `json:"transactions"`
+	PreviousBlockHash string        `json:"previousHash"`
 }
 
 func (b Block) AddTransaction(ta Transaction) {

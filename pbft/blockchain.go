@@ -8,29 +8,36 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type Blockchain struct {
-	Chain            []Block        `json:"chain"`
-	Peers            []Node         `json:"-"` // right now not shared but could be used to propagate new peers
-	Votings          map[int]Voting `json:"-"` // key - block ID
-	Identifier       string         `json:"node-id"`
-	BlockBuffer      map[int]Block  `json:"-"`
-	DiscoveryAddress string         `json:"-"`
-	Self             Node           `json:"-"`
+	Chain            []Block           `json:"chain"`
+	Peers            []Node            `json:"-"` // right now not shared but could be used to propagate new peers
+	Votings          map[string]Voting `json:"-"` // key - block ID, block ID stored as string so that the map can be encoded as JSON
+	Identifier       string            `json:"node-id"`
+	BlockBuffer      map[int]Block     `json:"-"`
+	DiscoveryAddress string            `json:"-"`
+	Self             Node              `json:"-"`
+}
+
+type VotingInfo struct {
+	VotingData Voting `json:"voting-data"`
+	BlockData  Block  `json:"block-data"`
 }
 
 func NewBlockchain(port int) *Blockchain {
 	var bc Blockchain
-	bc.Identifier = uuid.NewString()
+	// uuid in production, for debug id=hostname
+	// bc.Identifier = uuid.NewString()
 	bc.DiscoveryAddress = os.Getenv("DISCOVERY_ADDR")
-	bc.Votings = make(map[int]Voting)
+	bc.Votings = make(map[string]Voting)
 	bc.BlockBuffer = make(map[int]Block)
 
 	hostname := os.Getenv("HOSTNAME")
+	// DEBUG mode
+	bc.Identifier = hostname
 
 	self := Node{hostname, port, bc.Identifier, "blockchain"}
 	bc.Self = self
@@ -38,12 +45,13 @@ func NewBlockchain(port int) *Blockchain {
 	bc.RegisterNode()
 
 	bc.RefreshPeers()
-	if len(bc.Peers) < 2 {
+	if len(bc.Peers) < 1 {
+		fmt.Println("[INFO] too few peers, creating genesis block (peers:", bc.Peers, ")")
 		// create genesis block
 		initBlock := Block{Identifier: 0, Timestamp: int(time.Now().Unix()), Transactions: []Transaction{}, PreviousBlockHash: ""}
 		bc.Chain = append(bc.Chain, initBlock)
 	} else {
-		// fetch blockchain from a random peer
+		fmt.Println("[INFO] fetching blockchain from a peer")
 		peer := RandomNode(bc.Peers)
 
 		// prevent asking self for the current chain
@@ -117,19 +125,22 @@ func (bc Blockchain) PeerById(id string) Node {
 }
 
 func (bc *Blockchain) InsertVote(vote VoteRequest) {
-	voting, exists := bc.Votings[vote.BlockId]
+	voting, exists := bc.Votings[strconv.Itoa(vote.BlockId)]
 
 	if !exists {
 		// create new voting
+		bc.Votings[strconv.Itoa(vote.BlockId)] = Voting{vote.BlockId, []VoteRequest{}, []VoteRequest{}, vote.Client}
+		voting = bc.Votings[strconv.Itoa(vote.BlockId)]
 	}
 
 	if vote.Vote == "yes" {
-		voting.yesVotes = append(voting.yesVotes, vote)
+		voting.YesVotes = append(voting.YesVotes, vote)
 	} else if vote.Vote == "no" {
-		voting.noVotes = append(voting.noVotes, vote)
+		voting.NoVotes = append(voting.NoVotes, vote)
 	}
 
-	bc.Votings[voting.blockId] = voting
+	bc.Votings[strconv.Itoa(voting.BlockId)] = voting
+	bc.CheckVotingResults(voting.BlockId)
 }
 
 func (bc *Blockchain) RefreshPeers() {
@@ -148,7 +159,13 @@ func (bc *Blockchain) RefreshPeers() {
 		return
 	}
 
-	bc.Peers = newPeers
+	// remove self from the peer list
+	bc.Peers = nil
+	for _, peer := range newPeers {
+		if peer.Identifier != bc.Self.Identifier {
+			bc.Peers = append(bc.Peers, peer)
+		}
+	}
 }
 
 func (bc *Blockchain) PropagateMessage(endpoint string, message interface{}) bool {
@@ -183,12 +200,12 @@ func (bc *Blockchain) HttpGetChain(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, json.NewEncoder(w).Encode(bc))
 }
 
-func (bc Blockchain) HttpRequest(w http.ResponseWriter, r *http.Request) {
+func (bc *Blockchain) HttpRequest(w http.ResponseWriter, r *http.Request) {
 	// PBFT: Request Phase
 	// Node receives transaction data from a client (and thus becomes the "primary replica").
 
-	var transactions []Transaction
-	error := json.NewDecoder(r.Body).Decode(&transactions)
+	var req Request
+	error := json.NewDecoder(r.Body).Decode(&req)
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -196,7 +213,7 @@ func (bc Blockchain) HttpRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, HttpJsonBodyPadding(error.Error()), http.StatusBadRequest)
 		return
 	}
-	_, encodingErr := json.Marshal(transactions)
+	_, encodingErr := json.Marshal(req.Transactions)
 
 	if encodingErr != nil {
 		http.Error(w, HttpJsonBodyPadding(error.Error()), http.StatusBadRequest)
@@ -204,16 +221,37 @@ func (bc Blockchain) HttpRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var newBlock Block
-	newBlock.Transactions = append(newBlock.Transactions, transactions...)
+	newBlock.Transactions = append(newBlock.Transactions, req.Transactions...)
 	newBlock.Identifier = bc.LastBlock().Identifier + 1
 	newBlock.Timestamp = int(time.Now().Unix())
+	newBlock.PreviousBlockHash = calculateHash(bc.LastBlock())
 
-	success := bc.PropagateMessage("pre-prepare", newBlock)
+	bc.BlockBuffer[newBlock.Identifier] = newBlock
+
+	newVoting := Voting{BlockId: newBlock.Identifier, YesVotes: []VoteRequest{}, NoVotes: []VoteRequest{}, Client: req.Client}
+	jsonvoting, jsonerr := json.Marshal(newVoting)
+
+	if jsonerr != nil {
+		fmt.Println("json:", string(jsonvoting), "error", jsonerr)
+	}
+
+	votingData := VotingInfo{VotingData: newVoting, BlockData: newBlock}
+
+	fmt.Println("[PBFT] Request, new block:", newBlock)
+	fmt.Println("request new voting:", newVoting, ", client:", req.Client)
+
+	bc.Votings[strconv.Itoa(newBlock.Identifier)] = newVoting
+	// validate
+	vote := VoteRequest{BlockId: newVoting.BlockId, Vote: "yes", VoterId: bc.Self.Identifier, Client: req.Client}
+	bc.InsertVote(vote)
+
+	success := bc.PropagateMessage("pre-prepare", votingData)
 	if success {
-		fmt.Fprint(w, json.NewEncoder(w).Encode(newBlock))
+		fmt.Fprint(w, json.NewEncoder(w).Encode(votingData))
 	} else {
 		http.Error(w, HttpJsonBodyPadding("node connection error"), http.StatusBadRequest)
 	}
+	bc.PropagateMessage("prepare", vote)
 }
 
 func (bc Blockchain) HttpPrePrepare(w http.ResponseWriter, r *http.Request) {
@@ -222,22 +260,33 @@ func (bc Blockchain) HttpPrePrepare(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	var block Block
-	decodingErr := json.NewDecoder(r.Body).Decode(&block)
+	var votingInfo VotingInfo
+	decodingErr := json.NewDecoder(r.Body).Decode(&votingInfo)
 	if decodingErr != nil {
 		http.Error(w, HttpJsonBodyPadding("incorrect request body"), http.StatusBadRequest)
 	}
+
+	block := votingInfo.BlockData
+	voting := votingInfo.VotingData
+
+	fmt.Println("[PBFT] Pre-Prepare, block to validate:", block)
 	fmt.Fprint(w, json.NewEncoder(w).Encode(HttpJsonBodyPadding("ok")))
 
 	// temporarily we assume all transactions are valid
 
+	vote := VoteRequest{block.Identifier, "yes", bc.Identifier, voting.Client}
+
 	if block.Identifier < bc.LastBlock().Identifier+1 {
-		bc.PropagateMessage("prepare", VoteRequest{block.Identifier, "no", bc.Identifier})
+		vote.Vote = "no"
+		bc.InsertVote(vote)
+		bc.PropagateMessage("prepare", vote)
 		return
 	}
 	// further checks
 	bc.BlockBuffer[block.Identifier] = block
-	bc.PropagateMessage("prepare", VoteRequest{block.Identifier, "yes", bc.Identifier})
+	bc.Votings[strconv.Itoa(block.Identifier)] = voting
+	bc.InsertVote(vote)
+	bc.PropagateMessage("prepare", vote)
 }
 
 func (bc *Blockchain) HttpPrepare(w http.ResponseWriter, r *http.Request) {
@@ -251,7 +300,7 @@ func (bc *Blockchain) HttpPrepare(w http.ResponseWriter, r *http.Request) {
 	if decodingErr != nil {
 		http.Error(w, HttpJsonBodyPadding("incorrect request body"), http.StatusBadRequest)
 	}
-	fmt.Fprint(w, json.NewEncoder(w).Encode(HttpJsonBodyPadding("ok")))
+	fmt.Println("[PBFT] Prepare, received vote:", vote)
 
 	voter := bc.PeerById(vote.VoterId)
 	if voter == (Node{}) {
@@ -267,13 +316,19 @@ func (bc *Blockchain) HttpPrepare(w http.ResponseWriter, r *http.Request) {
 
 	bc.InsertVote(vote)
 	fmt.Fprint(w, json.NewEncoder(w).Encode(HttpJsonBodyPadding("ok")))
-
 	// check if their result is the same. If so, check if f+1 votes already received. If so, proceed to commit phase.
+}
+
+func (bc Blockchain) HttpGetPending(w http.ResponseWriter, r *http.Request) {
+	// Debug endpoint
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Println(bc.Votings)
+	fmt.Fprint(w, json.NewEncoder(w).Encode(bc.Votings))
 }
 
 func (bc *Blockchain) CheckVotingResults(blockId int) {
 	// Checks if sufficient number of votes has been casted. If so, proceed to commit.
-	voting, exists := bc.Votings[blockId]
+	voting, exists := bc.Votings[strconv.Itoa(blockId)]
 	if !exists {
 		return
 	}
@@ -281,7 +336,8 @@ func (bc *Blockchain) CheckVotingResults(blockId int) {
 	yesVotes, noVotes := voting.Results()
 	minVotes := len(bc.Peers) + 1 - bc.MaximumFaultyNodes()
 
-	if yesVotes > minVotes || noVotes > minVotes {
+	if yesVotes >= minVotes || noVotes >= minVotes {
+		fmt.Println("[INFO] committing block", blockId)
 		bc.Commit(blockId)
 	}
 }
@@ -292,27 +348,30 @@ func (bc *Blockchain) Commit(blockId int) {
 	// Before sending the result to client, nodes await f+1 votes where f is the maximum number of faulty nodes.
 
 	block, bExists := bc.BlockBuffer[blockId]
-	voting, vExists := bc.Votings[blockId]
+	voting, vExists := bc.Votings[strconv.Itoa(blockId)]
 
 	if !bExists || !vExists {
+		fmt.Println("[DEBUG commit] block / voting dont exist, block:", block, ", voting:", voting)
 		return
 	}
+
+	bc.RefreshPeers() // so that we get accurate minVotes
 
 	yesVotes, noVotes := voting.Results()
 	minVotes := len(bc.Peers) + 1 - bc.MaximumFaultyNodes()
 
-	if yesVotes > minVotes {
-		delete(bc.Votings, blockId)
+	if yesVotes >= minVotes {
+		delete(bc.Votings, strconv.Itoa(blockId))
 		block.PreviousBlockHash = calculateHash(bc.LastBlock())
 		bc.Chain = append(bc.Chain, block)
 		message := fmt.Sprintf("{\"node-id\": %v}", blockId)
 		messageBuffer, _ := json.Marshal(message)
-		_, err := http.Post(fmt.Sprintf("http://%v/commit", voting.client.String()), "application/json", bytes.NewBuffer(messageBuffer))
+		_, err := http.Post(fmt.Sprintf("http://%v/commit", voting.Client.String()), "application/json", bytes.NewBuffer(messageBuffer))
 		if err != nil {
 			// retry?
 			return
 		}
-	} else if noVotes > minVotes {
+	} else if noVotes >= minVotes {
 		// ??? notify the client their block was rejected?
 		return
 	}
