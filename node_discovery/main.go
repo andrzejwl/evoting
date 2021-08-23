@@ -19,6 +19,7 @@ type Node struct {
 	Port       int    `json:"port"`
 	Type       string `json:"node-type"`
 	Identifier string `json:"node-id"`
+	PublicKey  string `json:"public-key"`
 }
 
 func (n Node) String() string {

@@ -39,7 +39,10 @@ func NewBlockchain(port int) *Blockchain {
 	// DEBUG mode
 	bc.Identifier = hostname
 
-	self := Node{hostname, port, bc.Identifier, "blockchain"}
+	// generate priv/pub signing key pair
+	priv, pub := GenerateSigningKeyPair()
+
+	self := Node{hostname, port, bc.Identifier, "blockchain", pub, priv}
 	bc.Self = self
 
 	bc.RegisterNode()

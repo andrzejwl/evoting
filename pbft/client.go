@@ -41,8 +41,8 @@ func (pending PendingRequests) MaximumFaultyNodes() int {
 	return int((len(pending.nodes) - 1) / 3)
 }
 
-func (pending PendingRequests) RegisterNode(addr string, port int, idnt string) {
-	self := Node{Address: addr, Port: port, Identifier: idnt, Type: "client"}
+func (pending PendingRequests) RegisterNode(addr string, port int, idnt string, pubKey string, privKey string) {
+	self := Node{Address: addr, Port: port, Identifier: idnt, Type: "client", PublicKey: pubKey, privateKey: privKey}
 	pending.self = self
 
 	messageBuffer, _ := json.Marshal(pending.self)
@@ -171,8 +171,10 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 func StartClient(httpPort int) {
 	var pending PendingRequests
 	pending.discoveryAddress = os.Getenv("DISCOVERY_ADDR")
-	pending.self = Node{os.Getenv("HOSTNAME"), httpPort, uuid.NewString(), "client"}
-	pending.RegisterNode(pending.self.Address, pending.self.Port, pending.self.Identifier)
+
+	priv, pub := GenerateSigningKeyPair()
+	pending.RegisterNode(os.Getenv("HOSTNAME"), httpPort, uuid.NewString(), pub, priv)
+
 	fmt.Println("[CLIENT] Starting HTTP Listener")
 	pending.HttpHandler(httpPort)
 }
