@@ -5,6 +5,7 @@ Simple server that keeps track of all nodes and their type (blockchain/client).
 */
 
 import (
+	"crypto/rsa"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -15,11 +16,11 @@ import (
 )
 
 type Node struct {
-	Address    string `json:"address"`
-	Port       int    `json:"port"`
-	Type       string `json:"node-type"`
-	Identifier string `json:"node-id"`
-	PublicKey  string `json:"public-key"`
+	Address    string         `json:"address"`
+	Port       int            `json:"port"`
+	Type       string         `json:"node-type"`
+	Identifier string         `json:"node-id"`
+	PublicKey  *rsa.PublicKey `json:"public-key"`
 }
 
 func (n Node) String() string {

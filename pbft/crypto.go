@@ -1,65 +1,36 @@
 package pbft
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
-	"errors"
+	"crypto/sha256"
+	"encoding/hex"
 )
 
-func GenerateSigningKeyPair() (string, string) {
-	/*
-		Returns PEM encoded private and public key (strings)
-	*/
+func GenerateSigningKeyPair() (rsa.PrivateKey, *rsa.PublicKey) {
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 
-	privBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	privPem := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: privBytes,
-	})
-
-	pubBytes := x509.MarshalPKCS1PublicKey(&privateKey.PublicKey)
-	pubPem := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PUBLIC KEY",
-		Bytes: pubBytes,
-	})
-
-	return string(privPem), string(pubPem)
+	return *privateKey, &privateKey.PublicKey
 }
 
-func ParsePrivateKey(keyStr string) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(keyStr))
-	if block == nil {
-		return nil, errors.New("failed to parse key string")
-	}
+func SignData(message []byte, priv *rsa.PrivateKey) ([]byte, error) {
+	hash := sha256.Sum256(message)
 
-	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return priv, nil
+	return rsa.SignPKCS1v15(rand.Reader, priv, crypto.SHA256, hash[:])
 }
 
-func ParsePublicKey(keyStr string) (*rsa.PublicKey, error) {
-	block, _ := pem.Decode([]byte(keyStr))
+func VerifySignature(pub *rsa.PublicKey, signed []byte, message string) error {
+	// sigHash := sha256.Sum256(signed)
+	msgHash := sha256.Sum256([]byte(message))
+	// unhexlify string
 
-	if block == nil {
-		return nil, errors.New("failed to parse key string")
-	}
+	signUnhexed := make([]byte, hex.DecodedLen(len(signed)))
+	_, err := hex.Decode(signUnhexed, signed)
 
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	switch pub := pub.(type) {
-	case *rsa.PublicKey:
-		return pub, nil
-	default:
-		break // fall through
-	}
-	return nil, errors.New("key type is not RSA")
+	return rsa.VerifyPKCS1v15(pub, crypto.SHA256, msgHash[:], signUnhexed)
 }

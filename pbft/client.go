@@ -2,6 +2,7 @@ package pbft
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -41,7 +42,7 @@ func (pending PendingRequests) MaximumFaultyNodes() int {
 	return int((len(pending.nodes) - 1) / 3)
 }
 
-func (pending PendingRequests) RegisterNode(addr string, port int, idnt string, pubKey string, privKey string) {
+func (pending *PendingRequests) RegisterNode(addr string, port int, idnt string, pubKey *rsa.PublicKey, privKey *rsa.PrivateKey) {
 	self := Node{Address: addr, Port: port, Identifier: idnt, Type: "client", PublicKey: pubKey, privateKey: privKey}
 	pending.self = self
 
@@ -144,6 +145,7 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 	pendingRequests.RefreshNodes()
 	node := pendingRequests.SelectPrimaryReplica()
 	fmt.Println("[DEBUG] primary replica:", node.Identifier)
+	fmt.Println("[DEBUG] rqeuest:", request)
 
 	response, httpErr := http.Post(fmt.Sprintf("http://%v/request", node.String()), "application/json", bytes.NewBuffer(bodyBuffer))
 	if httpErr != nil {
@@ -173,7 +175,7 @@ func StartClient(httpPort int) {
 	pending.discoveryAddress = os.Getenv("DISCOVERY_ADDR")
 
 	priv, pub := GenerateSigningKeyPair()
-	pending.RegisterNode(os.Getenv("HOSTNAME"), httpPort, uuid.NewString(), pub, priv)
+	pending.RegisterNode(os.Getenv("HOSTNAME"), httpPort, uuid.NewString(), pub, &priv)
 
 	fmt.Println("[CLIENT] Starting HTTP Listener")
 	pending.HttpHandler(httpPort)

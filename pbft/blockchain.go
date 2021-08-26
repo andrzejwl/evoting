@@ -2,6 +2,7 @@ package pbft
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -42,7 +43,7 @@ func NewBlockchain(port int) *Blockchain {
 	// generate priv/pub signing key pair
 	priv, pub := GenerateSigningKeyPair()
 
-	self := Node{hostname, port, bc.Identifier, "blockchain", pub, priv}
+	self := Node{hostname, port, bc.Identifier, "blockchain", pub, &priv}
 	bc.Self = self
 
 	bc.RegisterNode()
@@ -118,7 +119,7 @@ func (bc Blockchain) LastBlock() Block {
 	return bc.Chain[len(bc.Chain)-1]
 }
 
-func (bc Blockchain) PeerById(id string) Node {
+func (bc *Blockchain) PeerById(id string) Node {
 	for _, peer := range bc.Peers {
 		if peer.Identifier == id {
 			return peer
@@ -127,8 +128,32 @@ func (bc Blockchain) PeerById(id string) Node {
 	return Node{}
 }
 
-func (bc *Blockchain) InsertVote(vote VoteRequest) {
+func (bc *Blockchain) InsertVote(vote VoteRequest, selfVote bool) {
 	voting, exists := bc.Votings[strconv.Itoa(vote.BlockId)]
+
+	voter := bc.PeerById(vote.VoterId)
+	if voter == (Node{}) && !selfVote {
+		fmt.Println("[ERROR] voter of given id not found", voter, "vote:", vote)
+		return
+	}
+
+	if selfVote {
+		voter = bc.Self
+	}
+
+	yesError := VerifySignature(voter.PublicKey, []byte(vote.Vote), "yes")
+	noError := VerifySignature(voter.PublicKey, []byte(vote.Vote), "no")
+
+	voteMsg := ""
+
+	if yesError == nil {
+		voteMsg = "yes"
+	} else if noError == nil {
+		voteMsg = "no"
+	} else {
+		fmt.Println("voter signature doesnt match", voter, "yes", yesError, ", no", noError)
+		return
+	}
 
 	if !exists {
 		// create new voting
@@ -136,9 +161,9 @@ func (bc *Blockchain) InsertVote(vote VoteRequest) {
 		voting = bc.Votings[strconv.Itoa(vote.BlockId)]
 	}
 
-	if vote.Vote == "yes" {
+	if voteMsg == "yes" {
 		voting.YesVotes = append(voting.YesVotes, vote)
-	} else if vote.Vote == "no" {
+	} else if voteMsg == "no" {
 		voting.NoVotes = append(voting.NoVotes, vote)
 	}
 
@@ -197,6 +222,18 @@ func (bc *Blockchain) PropagateMessage(endpoint string, message interface{}) boo
 	return true
 }
 
+func (bc Blockchain) SignMessage(message string) string {
+	/*
+		Returns hex encoded string (signed message).
+	*/
+	signed, _ := SignData([]byte(message), bc.Self.privateKey)
+
+	signedHex := make([]byte, hex.EncodedLen(len(signed)))
+	hex.Encode(signedHex, signed)
+
+	return string(signedHex)
+}
+
 func (bc *Blockchain) HttpGetChain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Println("GET /chain Request from:", r.RemoteAddr)
@@ -241,12 +278,11 @@ func (bc *Blockchain) HttpRequest(w http.ResponseWriter, r *http.Request) {
 	votingData := VotingInfo{VotingData: newVoting, BlockData: newBlock}
 
 	fmt.Println("[PBFT] Request, new block:", newBlock)
-	fmt.Println("request new voting:", newVoting, ", client:", req.Client)
 
 	bc.Votings[strconv.Itoa(newBlock.Identifier)] = newVoting
 	// validate
-	vote := VoteRequest{BlockId: newVoting.BlockId, Vote: "yes", VoterId: bc.Self.Identifier, Client: req.Client}
-	bc.InsertVote(vote)
+	vote := VoteRequest{BlockId: newVoting.BlockId, Vote: bc.SignMessage("yes"), VoterId: bc.Self.Identifier, Client: req.Client}
+	bc.InsertVote(vote, true)
 
 	success := bc.PropagateMessage("pre-prepare", votingData)
 	if success {
@@ -277,18 +313,18 @@ func (bc Blockchain) HttpPrePrepare(w http.ResponseWriter, r *http.Request) {
 
 	// temporarily we assume all transactions are valid
 
-	vote := VoteRequest{block.Identifier, "yes", bc.Identifier, voting.Client}
+	vote := VoteRequest{block.Identifier, bc.SignMessage("yes"), bc.Identifier, voting.Client}
 
 	if block.Identifier < bc.LastBlock().Identifier+1 {
-		vote.Vote = "no"
-		bc.InsertVote(vote)
+		vote.Vote = bc.SignMessage("no")
+		bc.InsertVote(vote, false)
 		bc.PropagateMessage("prepare", vote)
 		return
 	}
 	// further checks
 	bc.BlockBuffer[block.Identifier] = block
 	bc.Votings[strconv.Itoa(block.Identifier)] = voting
-	bc.InsertVote(vote)
+	bc.InsertVote(vote, true)
 	bc.PropagateMessage("prepare", vote)
 }
 
@@ -317,7 +353,7 @@ func (bc *Blockchain) HttpPrepare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bc.InsertVote(vote)
+	bc.InsertVote(vote, false)
 	fmt.Fprint(w, json.NewEncoder(w).Encode(HttpJsonBodyPadding("ok")))
 	// check if their result is the same. If so, check if f+1 votes already received. If so, proceed to commit phase.
 }
