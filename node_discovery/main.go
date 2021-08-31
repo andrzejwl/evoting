@@ -30,11 +30,25 @@ func (n Node) String() string {
 type NodeDiscovery struct {
 	BlockchainNodes []Node
 	ClientNodes     []Node
+	VotingParties   []VotingParty
+}
+
+type VotingParty struct {
+	Identifier string `json:"id"`
 }
 
 func NewDiscovery() *NodeDiscovery {
 	var nd NodeDiscovery
 	return &nd
+}
+
+func (nd *NodeDiscovery) GetPartyById(id string) *VotingParty {
+	for _, p := range nd.VotingParties {
+		if p.Identifier == id {
+			return &p
+		}
+	}
+	return nil
 }
 
 func (nd *NodeDiscovery) HttpGetAllNodes(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +64,26 @@ func (nd *NodeDiscovery) HttpGetBlockchain(w http.ResponseWriter, r *http.Reques
 
 func (nd *NodeDiscovery) HttpGetClients(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, json.NewEncoder(w).Encode(nd.ClientNodes))
+}
+
+func (nd *NodeDiscovery) HttpGetVotingParties(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, json.NewEncoder(w).Encode(nd.VotingParties))
+}
+
+func (nd *NodeDiscovery) HttpRegisterParty(w http.ResponseWriter, r *http.Request) {
+	var newParty VotingParty
+	decodingErr := json.NewDecoder(r.Body).Decode(&newParty)
+
+	if decodingErr != nil {
+		http.Error(w, "error parsing request body", http.StatusBadRequest)
+		return
+	}
+
+	if nd.GetPartyById(newParty.Identifier) == nil {
+		nd.VotingParties = append(nd.VotingParties, newParty)
+	}
+
+	fmt.Fprint(w, json.NewEncoder(w).Encode(nd.VotingParties))
 }
 
 func ContentTypeMiddleware(next http.Handler) http.Handler {
@@ -87,6 +121,9 @@ func HandleRequests(port int, nd *NodeDiscovery) {
 	r.HandleFunc("/get-blockchain", nd.HttpGetBlockchain).Methods("GET")
 	r.HandleFunc("/get-clients", nd.HttpGetClients).Methods("GET")
 	r.HandleFunc("/register", nd.HttpRegisterNode).Methods("POST")
+
+	r.HandleFunc("/get-parties", nd.HttpGetVotingParties).Methods("GET")
+	r.HandleFunc("/register-party", nd.HttpRegisterParty).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", port), r))
 }
