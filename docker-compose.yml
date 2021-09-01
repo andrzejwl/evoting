@@ -5,6 +5,13 @@ services:
     image: "evoting_node-discovery"
     ports:
       - 9999:9999
+  connector:
+    # build image with "docker build --tag evoting_connector ./connector"
+    image: "evoting_connector"
+    ports:
+      - 1234:1234
+    environment: 
+      - ND_ADDR=node-discovery:9999
   node-1:
     # build image with "docker build --tag evoting_node ."
     image: "evoting_node"
