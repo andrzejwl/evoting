@@ -272,7 +272,7 @@ func HttpAddVotingParty(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprint(w, json.NewEncoder(w).Encode(JsonBodyPadding("party registered")))
+	json.NewEncoder(w).Encode(JsonBodyPadding("party registered"))
 }
 
 func HttpGetStatistics(w http.ResponseWriter, r *http.Request) {

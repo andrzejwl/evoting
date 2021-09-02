@@ -105,7 +105,7 @@ func (pendingRequests *PendingRequests) ReceiveCommitInfo(w http.ResponseWriter,
 	var newCommit Commit
 	decodingErr := json.NewDecoder(r.Body).Decode(&newCommit)
 	if decodingErr != nil {
-		http.Error(w, HttpJsonBodyPadding("incorrect request body"), http.StatusBadRequest)
+		http.Error(w, JsonBodyPadding("incorrect request body"), http.StatusBadRequest)
 		return
 	}
 
@@ -119,7 +119,7 @@ func (pendingRequests *PendingRequests) ReceiveCommitInfo(w http.ResponseWriter,
 		// maybe notify the web server about successful request submission
 	}
 
-	fmt.Fprint(w, json.NewEncoder(w).Encode(HttpJsonBodyPadding("ok")))
+	json.NewEncoder(w).Encode(JsonBodyPadding("ok"))
 }
 
 func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *http.Request) {
@@ -132,14 +132,14 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 
 	error := json.NewDecoder(r.Body).Decode(&request)
 	if error != nil {
-		http.Error(w, HttpJsonBodyPadding("incorrect request body"), http.StatusBadRequest)
+		http.Error(w, JsonBodyPadding("incorrect request body"), http.StatusBadRequest)
 		return
 	}
 
 	bodyBuffer, bufferErr := json.Marshal(request)
 
 	if bufferErr != nil {
-		http.Error(w, HttpJsonBodyPadding("incorrect request body"), http.StatusBadRequest)
+		http.Error(w, JsonBodyPadding("incorrect request body"), http.StatusBadRequest)
 		return
 	}
 
@@ -151,13 +151,13 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 
 	response, httpErr := http.Post(fmt.Sprintf("http://%v/request", node.String()), "application/json", bytes.NewBuffer(bodyBuffer))
 	if httpErr != nil {
-		http.Error(w, HttpJsonBodyPadding("failed to connect to blockchain"), http.StatusBadRequest)
+		http.Error(w, JsonBodyPadding("failed to connect to blockchain"), http.StatusBadRequest)
 		return
 	}
 
 	if response.StatusCode != 200 {
 		body, _ := ioutil.ReadAll(response.Body)
-		http.Error(w, HttpJsonBodyPadding("blockchain error: "+string(body)), http.StatusBadRequest)
+		http.Error(w, JsonBodyPadding("blockchain error: "+string(body)), http.StatusBadRequest)
 		return
 	}
 
@@ -165,11 +165,11 @@ func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *
 	decodingErr := json.NewDecoder(response.Body).Decode(&block)
 
 	if decodingErr != nil {
-		http.Error(w, HttpJsonBodyPadding("blockchain error: "+decodingErr.Error()), http.StatusBadRequest)
+		http.Error(w, JsonBodyPadding("blockchain error: "+decodingErr.Error()), http.StatusBadRequest)
 		return
 	}
 
-	fmt.Fprint(w, json.NewEncoder(w).Encode(HttpJsonBodyPadding("request submitted to the blockchain")))
+	json.NewEncoder(w).Encode(JsonBodyPadding("request submitted to the blockchain"))
 }
 
 func StartClient(httpPort int) {

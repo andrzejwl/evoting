@@ -55,19 +55,20 @@ func (nd *NodeDiscovery) HttpGetAllNodes(w http.ResponseWriter, r *http.Request)
 	var all []Node
 	all = append(all, nd.BlockchainNodes...)
 	all = append(all, nd.ClientNodes...)
-	fmt.Fprint(w, json.NewEncoder(w).Encode(all))
+
+	json.NewEncoder(w).Encode(all)
 }
 
 func (nd *NodeDiscovery) HttpGetBlockchain(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, json.NewEncoder(w).Encode(nd.BlockchainNodes))
+	json.NewEncoder(w).Encode(nd.BlockchainNodes)
 }
 
 func (nd *NodeDiscovery) HttpGetClients(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, json.NewEncoder(w).Encode(nd.ClientNodes))
+	json.NewEncoder(w).Encode(nd.ClientNodes)
 }
 
 func (nd *NodeDiscovery) HttpGetVotingParties(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, json.NewEncoder(w).Encode(nd.VotingParties))
+	json.NewEncoder(w).Encode(nd.VotingParties)
 }
 
 func (nd *NodeDiscovery) HttpRegisterParty(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +84,7 @@ func (nd *NodeDiscovery) HttpRegisterParty(w http.ResponseWriter, r *http.Reques
 		nd.VotingParties = append(nd.VotingParties, newParty)
 	}
 
-	fmt.Fprint(w, json.NewEncoder(w).Encode(nd.VotingParties))
+	json.NewEncoder(w).Encode(nd.VotingParties)
 }
 
 func ContentTypeMiddleware(next http.Handler) http.Handler {
@@ -110,7 +111,7 @@ func (nd *NodeDiscovery) HttpRegisterNode(w http.ResponseWriter, r *http.Request
 		return
 	}
 	fmt.Println("[INFO] New peer registered", newNode)
-	fmt.Fprint(w, json.NewEncoder(w).Encode("{\"detail\":\"ok\"}"))
+	json.NewEncoder(w).Encode(`{"detail":"ok"}`)
 }
 
 func HandleRequests(port int, nd *NodeDiscovery) {

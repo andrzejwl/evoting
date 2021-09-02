@@ -237,7 +237,7 @@ func (bc Blockchain) SignMessage(message string) string {
 func (bc *Blockchain) HttpGetChain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Println("GET /chain Request from:", r.RemoteAddr)
-	fmt.Fprint(w, json.NewEncoder(w).Encode(bc))
+	json.NewEncoder(w).Encode(bc)
 }
 
 func (bc *Blockchain) HttpRequest(w http.ResponseWriter, r *http.Request) {
@@ -250,13 +250,13 @@ func (bc *Blockchain) HttpRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if error != nil {
-		http.Error(w, HttpJsonBodyPadding(error.Error()), http.StatusBadRequest)
+		http.Error(w, JsonBodyPadding(error.Error()), http.StatusBadRequest)
 		return
 	}
 	_, encodingErr := json.Marshal(req.Transactions)
 
 	if encodingErr != nil {
-		http.Error(w, HttpJsonBodyPadding(error.Error()), http.StatusBadRequest)
+		http.Error(w, JsonBodyPadding(error.Error()), http.StatusBadRequest)
 		return
 	}
 
@@ -286,9 +286,9 @@ func (bc *Blockchain) HttpRequest(w http.ResponseWriter, r *http.Request) {
 
 	success := bc.PropagateMessage("pre-prepare", votingData)
 	if success {
-		fmt.Fprint(w, json.NewEncoder(w).Encode(votingData))
+		json.NewEncoder(w).Encode(votingData)
 	} else {
-		http.Error(w, HttpJsonBodyPadding("node connection error"), http.StatusBadRequest)
+		http.Error(w, JsonBodyPadding("node connection error"), http.StatusBadRequest)
 	}
 	bc.PropagateMessage("prepare", vote)
 }
@@ -302,14 +302,14 @@ func (bc Blockchain) HttpPrePrepare(w http.ResponseWriter, r *http.Request) {
 	var votingInfo VotingInfo
 	decodingErr := json.NewDecoder(r.Body).Decode(&votingInfo)
 	if decodingErr != nil {
-		http.Error(w, HttpJsonBodyPadding("incorrect request body"), http.StatusBadRequest)
+		http.Error(w, JsonBodyPadding("incorrect request body"), http.StatusBadRequest)
 	}
 
 	block := votingInfo.BlockData
 	voting := votingInfo.VotingData
 
 	fmt.Println("[PBFT] Pre-Prepare, block to validate:", block)
-	fmt.Fprint(w, json.NewEncoder(w).Encode(HttpJsonBodyPadding("ok")))
+	json.NewEncoder(w).Encode(JsonBodyPadding("ok"))
 
 	// temporarily we assume all transactions are valid
 
@@ -337,24 +337,24 @@ func (bc *Blockchain) HttpPrepare(w http.ResponseWriter, r *http.Request) {
 	decodingErr := json.NewDecoder(r.Body).Decode(&vote)
 
 	if decodingErr != nil {
-		http.Error(w, HttpJsonBodyPadding("incorrect request body"), http.StatusBadRequest)
+		http.Error(w, JsonBodyPadding("incorrect request body"), http.StatusBadRequest)
 	}
 	fmt.Println("[PBFT] Prepare, received vote:", vote)
 
 	voter := bc.PeerById(vote.VoterId)
 	if voter == (Node{}) {
 		// TODO: verify signature
-		http.Error(w, HttpJsonBodyPadding("peer not found"), http.StatusForbidden)
+		http.Error(w, JsonBodyPadding("peer not found"), http.StatusForbidden)
 		return
 	}
 
 	if vote == (VoteRequest{}) {
-		http.Error(w, HttpJsonBodyPadding("vote invalid"), http.StatusBadRequest)
+		http.Error(w, JsonBodyPadding("vote invalid"), http.StatusBadRequest)
 		return
 	}
 
 	bc.InsertVote(vote, false)
-	fmt.Fprint(w, json.NewEncoder(w).Encode(HttpJsonBodyPadding("ok")))
+	json.NewEncoder(w).Encode(JsonBodyPadding("ok"))
 	// check if their result is the same. If so, check if f+1 votes already received. If so, proceed to commit phase.
 }
 
@@ -362,7 +362,7 @@ func (bc Blockchain) HttpGetPending(w http.ResponseWriter, r *http.Request) {
 	// Debug endpoint
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Println(bc.Votings)
-	fmt.Fprint(w, json.NewEncoder(w).Encode(bc.Votings))
+	json.NewEncoder(w).Encode(bc.Votings)
 }
 
 func (bc *Blockchain) CheckVotingResults(blockId int) {
