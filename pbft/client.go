@@ -118,6 +118,8 @@ func (pendingRequests *PendingRequests) ReceiveCommitInfo(w http.ResponseWriter,
 		delete(pendingRequests.requests, newCommit.BlockId)
 		// maybe notify the web server about successful request submission
 	}
+
+	fmt.Fprint(w, json.NewEncoder(w).Encode(HttpJsonBodyPadding("ok")))
 }
 
 func (pendingRequests *PendingRequests) CreateRequest(w http.ResponseWriter, r *http.Request) {
