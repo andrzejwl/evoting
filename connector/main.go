@@ -251,11 +251,7 @@ func HttpAddVotingParty(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ndAddr := os.Getenv("ND_ADDR")
-
-	if ndAddr == "" {
-		ndAddr = "127.0.0.1:9999" // debug address
-	}
+	ndAddr := NodeDiscoveryAddress()
 
 	msgBuffer, _ := json.Marshal(newParty)
 	resp, err := http.Post(fmt.Sprintf("http://%v/register-party", ndAddr), "application/json", bytes.NewBuffer(msgBuffer))
