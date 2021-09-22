@@ -96,7 +96,7 @@ func (bc *Blockchain) ValidateTransactions() {
 func (bc *Blockchain) HttpGetChain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Println("GET /chain Request from:", r.RemoteAddr)
-	fmt.Fprint(w, json.NewEncoder(w).Encode(bc))
+	json.NewEncoder(w).Encode(bc)
 }
 
 func (bc *Blockchain) HttpCreateTransaction(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +113,7 @@ func (bc *Blockchain) HttpCreateTransaction(w http.ResponseWriter, r *http.Reque
 	// in the future ValidateTransactions should not be called separately for each transaction
 	// might need to add a database to store the transactions in
 	bc.ValidateTransactions()
-	fmt.Fprint(w, json.NewEncoder(w).Encode(bc))
+	json.NewEncoder(w).Encode(bc)
 }
 
 func (bc *Blockchain) HttpUpdate(w http.ResponseWriter, r *http.Request) {
@@ -126,7 +126,7 @@ func (bc *Blockchain) HttpUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	bc.Consensus(newChain)
-	fmt.Fprint(w, json.NewEncoder(w).Encode("{\"detail\":\"ok\"}"))
+	json.NewEncoder(w).Encode("{\"detail\":\"ok\"}")
 }
 
 func (bc Blockchain) IsValid() bool {
