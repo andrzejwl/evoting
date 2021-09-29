@@ -1,0 +1,32 @@
+version: "3.9"
+services:
+  connector:
+    # build image with "docker build --tag evoting_connector ./connector"
+    image: "evoting_connector"
+    ports:
+      - 1234:1234
+    environment: 
+      - ND_ADDR=node-discovery:9999
+  node-1:
+    # build image with "docker build --tag evoting_node ."
+    image: "evoting_node"
+    ports:
+      - 1337:1337
+    entrypoint: ["/evoting", "-consensus=pow", "-root=true"]
+    environment: 
+      - DOCKER=1
+      - HOSTNAME=node-1
+      - PORT=1337
+  node-2:
+    image: "evoting_node"
+    ports:
+      - 1338:1338
+    depends_on: 
+      - node-1
+    entrypoint: ["/evoting", "-consensus=pow"]
+    environment: 
+      - DOCKER=1
+      - HOSTNAME=node-2
+      - PORT=1338
+      - PEER_HOSTNAME=node-1
+      - PEER_PORT=1337

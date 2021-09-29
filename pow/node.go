@@ -3,8 +3,8 @@ package pow
 import "fmt"
 
 type Node struct {
-	Address string
-	Port    int
+	Address string `json:"address"`
+	Port    int    `json:"port"`
 }
 
 func (n Node) String() string {

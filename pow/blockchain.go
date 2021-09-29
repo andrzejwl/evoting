@@ -18,10 +18,11 @@ type Blockchain struct {
 	Difficulty          int           `json:"difficulty"`
 	pendingTransactions []Transaction // no need to export this field
 	blockHashes         []string      // maintained so that hashes are not calculated all the time
-	Peers               []Node        `json:"-"` // right now not shared but could be used to propagate new peers
+	Peers               []Node        `json:"peers"` // used to propagate new peers
+	Self                Node          `json:"-"`
 }
 
-func NewBlockchain(difficulty int) *Blockchain {
+func NewBlockchain(difficulty int, hostname string, port int) *Blockchain {
 	var initBlock Block
 	if DEBUG_MODE {
 		initBlock = Block{Timestamp: 0, Nonce: 0, Transactions: []Transaction{}}
@@ -34,6 +35,7 @@ func NewBlockchain(difficulty int) *Blockchain {
 		Chain:               []Block{initBlock},
 		Difficulty:          difficulty,
 		pendingTransactions: []Transaction{},
+		Self:                Node{Port: port, Address: hostname},
 	}
 }
 
@@ -108,7 +110,7 @@ func (bc *Blockchain) HttpCreateTransaction(w http.ResponseWriter, r *http.Reque
 		http.Error(w, error.Error(), http.StatusBadRequest)
 		return
 	}
-
+	bc.Update(false)
 	bc.AddTransaction(t)
 	// in the future ValidateTransactions should not be called separately for each transaction
 	// might need to add a database to store the transactions in
@@ -126,7 +128,7 @@ func (bc *Blockchain) HttpUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	bc.Consensus(newChain)
-	json.NewEncoder(w).Encode("{\"detail\":\"ok\"}")
+	json.NewEncoder(w).Encode(`{"detail":"ok"}`)
 }
 
 func (bc Blockchain) IsValid() bool {
@@ -144,6 +146,12 @@ func (bc *Blockchain) Consensus(outsideChain Blockchain) {
 	*/
 	if !outsideChain.IsValid() || bc.length() >= outsideChain.length() {
 		return
+	}
+
+	for _, peer := range outsideChain.Peers {
+		if peer != bc.Self && !Exists(bc.Peers, peer) {
+			bc.Peers = append(bc.Peers, peer)
+		}
 	}
 
 	if calculateHash(bc.GenesisBlock()) == calculateHash(outsideChain.GenesisBlock()) {
@@ -172,7 +180,7 @@ func ReconstructBlockchain(r io.ReadCloser) (Blockchain, string) {
 func (bc *Blockchain) Update(initialize bool) {
 	// TODO: check if pending transactions have not already been validated and appended by other nodes
 	for _, peer := range bc.Peers {
-		resp, err := http.Get(fmt.Sprintf("http://%v/chain/", peer.String()))
+		resp, err := http.Get(fmt.Sprintf("http://%v/chain", peer.String()))
 		if err != nil {
 			fmt.Println("[ERR]", err, "Peer chain check failed, skipping peer", peer)
 			continue
@@ -180,7 +188,7 @@ func (bc *Blockchain) Update(initialize bool) {
 
 		peerBc, reconstructErr := ReconstructBlockchain(resp.Body)
 		if reconstructErr != "" {
-			fmt.Println("[ERR] Peer chain check failed, skipping peer", peer)
+			fmt.Println("[ERR] Peer chain check failed, skipping peer", peer, "error:", reconstructErr)
 			continue
 		}
 		if initialize {
@@ -198,7 +206,25 @@ func (bc *Blockchain) HttpTriggerUpdate(w http.ResponseWriter, r *http.Request) 
 	*/
 	bc.Update(false)
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprint(w, "{\"detail\": \"ok\"}")
+	fmt.Fprint(w, `{"detail": "ok"}`)
+}
+
+func (bc *Blockchain) HttpRegisterPeer(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var peer Node
+
+	decodingErr := json.NewDecoder(r.Body).Decode(&peer)
+	if decodingErr != nil {
+		http.Error(w, `{"detail": "failed to parse request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if peer != bc.Self && !Exists(bc.Peers, peer) {
+		bc.Peers = append(bc.Peers, peer)
+	}
+
+	fmt.Fprint(w, `{"detail": "ok"}`)
 }
 
 func (bc Blockchain) PropagateChain() {
@@ -223,6 +249,20 @@ func (bc Blockchain) PropagateChain() {
 				fmt.Println("[ERR]", respErr.Error())
 			}
 			fmt.Println("[ERR] Response from", peer, ": status code:", resp.StatusCode, ", response:", string(body))
+		}
+	}
+}
+
+func (bc Blockchain) PropagateSelf() {
+	/*
+		Usually called after startup.
+	*/
+	bodyBytes, _ := json.Marshal(bc.Self)
+
+	for _, peer := range bc.Peers {
+		resp, err := http.Post(fmt.Sprintf("http://%v/register-peer", peer), "application/json", bytes.NewBuffer([]byte(bodyBytes)))
+		if resp.StatusCode != http.StatusOK || err != nil {
+			fmt.Println("[INFO] Failed to propagate self to", peer)
 		}
 	}
 }
