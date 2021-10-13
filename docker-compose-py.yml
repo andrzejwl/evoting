@@ -1,0 +1,112 @@
+services:
+  connector:
+    environment:
+    - ND_ADDR=node-discovery:9999
+    image: evoting_connector
+    ports:
+    - 1234:1234
+  node-1:
+    depends_on:
+    - node-discovery
+    entrypoint: '["/evoting", "-consensus=pbft", "-port=1337"]'
+    environment:
+    - HOSTNAME=node-1
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 1337:1337
+  node-10:
+    depends_on:
+    - node-discovery
+    entrypoint: '["/evoting", "-consensus=pbft", "-port=1346"]'
+    environment:
+    - HOSTNAME=node-10
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 1346:1346
+  node-2:
+    depends_on:
+    - node-discovery
+    entrypoint: '["/evoting", "-consensus=pbft", "-port=1338"]'
+    environment:
+    - HOSTNAME=node-2
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 1338:1338
+  node-3:
+    depends_on:
+    - node-discovery
+    entrypoint: '["/evoting", "-consensus=pbft", "-port=1339"]'
+    environment:
+    - HOSTNAME=node-3
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 1339:1339
+  node-4:
+    depends_on:
+    - node-discovery
+    entrypoint: '["/evoting", "-consensus=pbft", "-port=1340"]'
+    environment:
+    - HOSTNAME=node-4
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 1340:1340
+  node-5:
+    depends_on:
+    - node-discovery
+    entrypoint: '["/evoting", "-consensus=pbft", "-port=1341"]'
+    environment:
+    - HOSTNAME=node-5
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 1341:1341
+  node-6:
+    depends_on:
+    - node-discovery
+    entrypoint: '["/evoting", "-consensus=pbft", "-port=1342"]'
+    environment:
+    - HOSTNAME=node-6
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 1342:1342
+  node-7:
+    depends_on:
+    - node-discovery
+    entrypoint: '["/evoting", "-consensus=pbft", "-port=1343"]'
+    environment:
+    - HOSTNAME=node-7
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 1343:1343
+  node-8:
+    depends_on:
+    - node-discovery
+    entrypoint: '["/evoting", "-consensus=pbft", "-port=1344"]'
+    environment:
+    - HOSTNAME=node-8
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 1344:1344
+  node-9:
+    depends_on:
+    - node-discovery
+    entrypoint: '["/evoting", "-consensus=pbft", "-port=1345"]'
+    environment:
+    - HOSTNAME=node-9
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 1345:1345
+  node-discovery:
+    image: evoting_node-discovery
+    ports:
+    - 9999:9999
+version: '3.9'
