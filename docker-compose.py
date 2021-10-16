@@ -4,6 +4,7 @@ generate docker-compose dynamically
 
 from typing import Dict, List
 import yaml
+import codecs
 
 class Compose(object):
     def __init__(self, version='3.9') -> None:
@@ -13,7 +14,7 @@ class Compose(object):
         }
         super().__init__()
 
-    def add_service(self, name: str, image: str = None, ports: List[str] = None, env_vars: List['str'] = None, depends_on: List['str'] = None, entrypoint: List = None):
+    def add_service(self, name: str, image: str = None, ports: List[str] = None, env_vars: List['str'] = None, depends_on: List['str'] = None, entrypoint: str = None):
         self.root['services'][name] = {}
 
         if image:
@@ -35,19 +36,49 @@ class Compose(object):
         f = open(filename, 'w+')
         yaml.dump(self.root, f)
         f.close()
-
+        
+        # remove single quotes from entrypoint
+        f = open(filename, 'r+')
+        contents = f.read()
+        print(contents)
+        contents = contents.replace("'[", "[")
+        contents = contents.replace("]'", "]")
+        f.seek(0)
+        f.write(contents)
+        f.truncate()
+        f.close()
+    
 
 compose = Compose()
 compose.add_service(name='node-discovery', image='evoting_node-discovery', ports=['9999:9999',])
 compose.add_service(name='connector', image='evoting_connector', ports=['1234:1234',], env_vars=['ND_ADDR=node-discovery:9999'])
+
+# blockchain nodes
 for i in range(10):
     compose.add_service(
         name=f'node-{i+1}', 
         image='evoting_node', 
         ports=[f'{1337+i}:{1337+i}',], 
         depends_on=['node-discovery'], 
-        env_vars=[f'HOSTNAME=node-{i+1}', 
-        'DISCOVERY_ADDR=node-discovery:9999'],
+        env_vars=[
+            f'HOSTNAME=node-{i+1}', 
+            'DISCOVERY_ADDR=node-discovery:9999',
+        ],
         entrypoint=f'["/evoting", "-consensus=pbft", "-port={1337+i}"]',
     )
+
+# client nodes
+for i in range(3):
+    compose.add_service(
+        name=f'client-{i+1}', 
+        image='evoting_node', 
+        ports=[f'{2001+i}:{2001+i}',], 
+        depends_on=['node-discovery'], 
+        env_vars=[
+            f'HOSTNAME=client-{i+1}', 
+            'DISCOVERY_ADDR=node-discovery:9999',
+        ],
+        entrypoint=f'["/evoting", "-client_mode=true", "-port={2001+i}"]',
+    )
+
 compose.dump()    

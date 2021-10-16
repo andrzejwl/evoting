@@ -1,4 +1,34 @@
 services:
+  client-1:
+    depends_on:
+    - node-discovery
+    entrypoint: ["/evoting", "-client_mode=true", "-port=2001"]
+    environment:
+    - HOSTNAME=client-1
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 2001:2001
+  client-2:
+    depends_on:
+    - node-discovery
+    entrypoint: ["/evoting", "-client_mode=true", "-port=2002"]
+    environment:
+    - HOSTNAME=client-2
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 2002:2002
+  client-3:
+    depends_on:
+    - node-discovery
+    entrypoint: ["/evoting", "-client_mode=true", "-port=2003"]
+    environment:
+    - HOSTNAME=client-3
+    - DISCOVERY_ADDR=node-discovery:9999
+    image: evoting_node
+    ports:
+    - 2003:2003
   connector:
     environment:
     - ND_ADDR=node-discovery:9999
@@ -8,7 +38,7 @@ services:
   node-1:
     depends_on:
     - node-discovery
-    entrypoint: '["/evoting", "-consensus=pbft", "-port=1337"]'
+    entrypoint: ["/evoting", "-consensus=pbft", "-port=1337"]
     environment:
     - HOSTNAME=node-1
     - DISCOVERY_ADDR=node-discovery:9999
@@ -18,7 +48,7 @@ services:
   node-10:
     depends_on:
     - node-discovery
-    entrypoint: '["/evoting", "-consensus=pbft", "-port=1346"]'
+    entrypoint: ["/evoting", "-consensus=pbft", "-port=1346"]
     environment:
     - HOSTNAME=node-10
     - DISCOVERY_ADDR=node-discovery:9999
@@ -28,7 +58,7 @@ services:
   node-2:
     depends_on:
     - node-discovery
-    entrypoint: '["/evoting", "-consensus=pbft", "-port=1338"]'
+    entrypoint: ["/evoting", "-consensus=pbft", "-port=1338"]
     environment:
     - HOSTNAME=node-2
     - DISCOVERY_ADDR=node-discovery:9999
@@ -38,7 +68,7 @@ services:
   node-3:
     depends_on:
     - node-discovery
-    entrypoint: '["/evoting", "-consensus=pbft", "-port=1339"]'
+    entrypoint: ["/evoting", "-consensus=pbft", "-port=1339"]
     environment:
     - HOSTNAME=node-3
     - DISCOVERY_ADDR=node-discovery:9999
@@ -48,7 +78,7 @@ services:
   node-4:
     depends_on:
     - node-discovery
-    entrypoint: '["/evoting", "-consensus=pbft", "-port=1340"]'
+    entrypoint: ["/evoting", "-consensus=pbft", "-port=1340"]
     environment:
     - HOSTNAME=node-4
     - DISCOVERY_ADDR=node-discovery:9999
@@ -58,7 +88,7 @@ services:
   node-5:
     depends_on:
     - node-discovery
-    entrypoint: '["/evoting", "-consensus=pbft", "-port=1341"]'
+    entrypoint: ["/evoting", "-consensus=pbft", "-port=1341"]
     environment:
     - HOSTNAME=node-5
     - DISCOVERY_ADDR=node-discovery:9999
@@ -68,7 +98,7 @@ services:
   node-6:
     depends_on:
     - node-discovery
-    entrypoint: '["/evoting", "-consensus=pbft", "-port=1342"]'
+    entrypoint: ["/evoting", "-consensus=pbft", "-port=1342"]
     environment:
     - HOSTNAME=node-6
     - DISCOVERY_ADDR=node-discovery:9999
@@ -78,7 +108,7 @@ services:
   node-7:
     depends_on:
     - node-discovery
-    entrypoint: '["/evoting", "-consensus=pbft", "-port=1343"]'
+    entrypoint: ["/evoting", "-consensus=pbft", "-port=1343"]
     environment:
     - HOSTNAME=node-7
     - DISCOVERY_ADDR=node-discovery:9999
@@ -88,7 +118,7 @@ services:
   node-8:
     depends_on:
     - node-discovery
-    entrypoint: '["/evoting", "-consensus=pbft", "-port=1344"]'
+    entrypoint: ["/evoting", "-consensus=pbft", "-port=1344"]
     environment:
     - HOSTNAME=node-8
     - DISCOVERY_ADDR=node-discovery:9999
@@ -98,7 +128,7 @@ services:
   node-9:
     depends_on:
     - node-discovery
-    entrypoint: '["/evoting", "-consensus=pbft", "-port=1345"]'
+    entrypoint: ["/evoting", "-consensus=pbft", "-port=1345"]
     environment:
     - HOSTNAME=node-9
     - DISCOVERY_ADDR=node-discovery:9999
