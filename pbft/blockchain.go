@@ -171,20 +171,20 @@ func (bc *Blockchain) InsertVote(vote VoteRequest, selfVote bool) {
 	bc.CheckVotingResults(voting.BlockId)
 }
 
-func (bc *Blockchain) RefreshPeers() {
+func (bc *Blockchain) RefreshPeers() []Node {
 	var newPeers []Node
 	resp, err := http.Get(fmt.Sprintf("http://%v/get-blockchain", bc.DiscoveryAddress))
 
 	if err != nil {
 		fmt.Println("[CLIENT] failed to refresh nodes")
-		return
+		return nil
 	}
 
 	decodingErr := json.NewDecoder(resp.Body).Decode(&newPeers)
 
 	if decodingErr != nil {
 		fmt.Println("[ERROR] node discovery's response is ambiguous")
-		return
+		return nil
 	}
 
 	// remove self from the peer list
@@ -194,6 +194,7 @@ func (bc *Blockchain) RefreshPeers() {
 			bc.Peers = append(bc.Peers, peer)
 		}
 	}
+	return bc.Peers
 }
 
 func (bc *Blockchain) PropagateMessage(endpoint string, message interface{}) bool {
@@ -293,7 +294,7 @@ func (bc *Blockchain) HttpRequest(w http.ResponseWriter, r *http.Request) {
 	bc.PropagateMessage("prepare", vote)
 }
 
-func (bc Blockchain) HttpPrePrepare(w http.ResponseWriter, r *http.Request) {
+func (bc *Blockchain) HttpPrePrepare(w http.ResponseWriter, r *http.Request) {
 	// PBFT: Pre-prepare Phase
 	// Node receives a block to validate from the primary node.
 
@@ -323,7 +324,14 @@ func (bc Blockchain) HttpPrePrepare(w http.ResponseWriter, r *http.Request) {
 	}
 	// further checks
 	bc.BlockBuffer[block.Identifier] = block
-	bc.Votings[strconv.Itoa(block.Identifier)] = voting
+
+	/*
+		It's possible that a node receives votes for a particular block before pre-prepare for the block arrives.
+		If that's the case - check if a voting already exists (to prevent overriding existing votes).
+	*/
+	if _, exists := bc.Votings[strconv.Itoa(block.Identifier)]; !exists {
+		bc.Votings[strconv.Itoa(block.Identifier)] = voting
+	}
 	bc.InsertVote(vote, true)
 	bc.PropagateMessage("prepare", vote)
 }
@@ -339,7 +347,7 @@ func (bc *Blockchain) HttpPrepare(w http.ResponseWriter, r *http.Request) {
 	if decodingErr != nil {
 		http.Error(w, JsonBodyPadding("incorrect request body"), http.StatusBadRequest)
 	}
-	fmt.Println("[PBFT] Prepare, received vote:", vote)
+	// fmt.Println("[PBFT] Prepare, received vote:", vote)
 
 	voter := bc.PeerById(vote.VoterId)
 	if voter == (Node{}) {
@@ -358,11 +366,23 @@ func (bc *Blockchain) HttpPrepare(w http.ResponseWriter, r *http.Request) {
 	// check if their result is the same. If so, check if f+1 votes already received. If so, proceed to commit phase.
 }
 
-func (bc Blockchain) HttpGetPending(w http.ResponseWriter, r *http.Request) {
+func (bc *Blockchain) HttpGetPending(w http.ResponseWriter, r *http.Request) {
 	// Debug endpoint
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Println(bc.Votings)
 	json.NewEncoder(w).Encode(bc.Votings)
+}
+
+func (bc *Blockchain) HttpGetPeers(w http.ResponseWriter, r *http.Request) {
+	// Debug endpoint
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(bc.Peers)
+}
+
+func (bc *Blockchain) HttpTriggerRefresh(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(JsonBodyPadding("ok"))
+
+	bc.Peers = bc.RefreshPeers()
 }
 
 func (bc *Blockchain) CheckVotingResults(blockId int) {
@@ -376,7 +396,7 @@ func (bc *Blockchain) CheckVotingResults(blockId int) {
 	minVotes := len(bc.Peers) + 1 - bc.MaximumFaultyNodes()
 
 	if yesVotes >= minVotes || noVotes >= minVotes {
-		fmt.Println("[INFO] committing block", blockId)
+		fmt.Println("[INFO] committing block", blockId, ", min votes:", minVotes)
 		bc.Commit(blockId)
 	}
 }
@@ -390,7 +410,7 @@ func (bc *Blockchain) Commit(blockId int) {
 	voting, vExists := bc.Votings[strconv.Itoa(blockId)]
 
 	if !bExists || !vExists {
-		fmt.Println("[DEBUG commit] block / voting dont exist, block:", block, ", voting:", voting)
+		fmt.Println("[DEBUG commit] block / voting doesnt exist, waiting for block data in pre-prepare") // enough votes have been casted but pre-prepare hasn't arrived yet.
 		return
 	}
 
