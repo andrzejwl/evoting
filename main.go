@@ -68,14 +68,7 @@ func main() {
 
 			blockchain.Update(true)
 		}
-		// else {
-		// 	t1 := pow.Transaction{TokenId: "qqqq-wwww-vvvv-aaaa", ToId: "abc"}
-		// 	t2 := pow.Transaction{TokenId: RandomString(16), ToId: RandomString(5)}
 
-		// 	blockchain.AddTransaction(t1)
-		// 	blockchain.AddTransaction(t2)
-		// 	blockchain.ValidateTransactions()
-		// }
 		fmt.Println("Starting HTTP server on port", blockchain.Self.Port)
 		blockchain.PropagateSelf()
 		pow.HandleRequests(blockchain)
