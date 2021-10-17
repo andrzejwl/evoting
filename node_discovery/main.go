@@ -112,6 +112,13 @@ func (nd *NodeDiscovery) HttpRegisterNode(w http.ResponseWriter, r *http.Request
 	}
 	fmt.Println("[INFO] New peer registered", newNode)
 	json.NewEncoder(w).Encode(`{"detail":"ok"}`)
+
+	for _, node := range nd.BlockchainNodes {
+		_, err := http.Get(fmt.Sprintf("http://%v/refresh", node))
+		if err != nil {
+			fmt.Println("[ERR] failed to trigger refresh at", node)
+		}
+	}
 }
 
 func HandleRequests(port int, nd *NodeDiscovery) {
