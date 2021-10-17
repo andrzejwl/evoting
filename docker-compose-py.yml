@@ -48,6 +48,7 @@ services:
   node-10:
     depends_on:
     - node-discovery
+    - node-9
     entrypoint: ["/evoting", "-consensus=pbft", "-port=1346"]
     environment:
     - HOSTNAME=node-10
@@ -58,6 +59,7 @@ services:
   node-2:
     depends_on:
     - node-discovery
+    - node-1
     entrypoint: ["/evoting", "-consensus=pbft", "-port=1338"]
     environment:
     - HOSTNAME=node-2
@@ -68,6 +70,7 @@ services:
   node-3:
     depends_on:
     - node-discovery
+    - node-2
     entrypoint: ["/evoting", "-consensus=pbft", "-port=1339"]
     environment:
     - HOSTNAME=node-3
@@ -78,6 +81,7 @@ services:
   node-4:
     depends_on:
     - node-discovery
+    - node-3
     entrypoint: ["/evoting", "-consensus=pbft", "-port=1340"]
     environment:
     - HOSTNAME=node-4
@@ -88,6 +92,7 @@ services:
   node-5:
     depends_on:
     - node-discovery
+    - node-4
     entrypoint: ["/evoting", "-consensus=pbft", "-port=1341"]
     environment:
     - HOSTNAME=node-5
@@ -98,6 +103,7 @@ services:
   node-6:
     depends_on:
     - node-discovery
+    - node-5
     entrypoint: ["/evoting", "-consensus=pbft", "-port=1342"]
     environment:
     - HOSTNAME=node-6
@@ -108,6 +114,7 @@ services:
   node-7:
     depends_on:
     - node-discovery
+    - node-6
     entrypoint: ["/evoting", "-consensus=pbft", "-port=1343"]
     environment:
     - HOSTNAME=node-7
@@ -118,6 +125,7 @@ services:
   node-8:
     depends_on:
     - node-discovery
+    - node-7
     entrypoint: ["/evoting", "-consensus=pbft", "-port=1344"]
     environment:
     - HOSTNAME=node-8
@@ -128,6 +136,7 @@ services:
   node-9:
     depends_on:
     - node-discovery
+    - node-8
     entrypoint: ["/evoting", "-consensus=pbft", "-port=1345"]
     environment:
     - HOSTNAME=node-9
