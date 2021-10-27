@@ -8,6 +8,7 @@ services:
     environment: 
       - ND_ADDR=node-discovery:9999
   node-1:
+    container_name: "pow_node-1"
     # build image with "docker build --tag evoting_node ."
     image: "evoting_node"
     ports:
@@ -18,6 +19,7 @@ services:
       - HOSTNAME=node-1
       - PORT=1337
   node-2:
+    container_name: "pow_node-2"
     image: "evoting_node"
     ports:
       - 1338:1338
@@ -28,5 +30,19 @@ services:
       - DOCKER=1
       - HOSTNAME=node-2
       - PORT=1338
+      - PEER_HOSTNAME=node-1
+      - PEER_PORT=1337
+  node-3:
+    container_name: "pow_node-3"
+    image: "evoting_node"
+    ports:
+      - 1339:1339
+    depends_on: 
+      - node-2
+    entrypoint: ["/evoting", "-consensus=pow"]
+    environment: 
+      - DOCKER=1
+      - HOSTNAME=node-3
+      - PORT=1339
       - PEER_HOSTNAME=node-1
       - PEER_PORT=1337
