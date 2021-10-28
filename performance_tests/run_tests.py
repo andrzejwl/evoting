@@ -1,3 +1,4 @@
+import argparse
 import docker
 import requests
 import subprocess
@@ -138,6 +139,8 @@ def start_tests_for_consensus(consensus: str, transactions: int, rounds: int, no
     filename = f'DATA_{now.strftime("%d_%m_%H-%M")}.xlsx'
     memory_workbook = xlsxwriter.Workbook(filename='MEMORY_'+filename)
     cpu_workbook = xlsxwriter.Workbook(filename='CPU_'+filename)
+    cont_prefix = 'pow_' if consensus == 'pow' else 'evoting_'
+    cont_suffix = '' if consensus == 'pow' else '_1'
 
     for round in range(rounds):
         xlsx_data = {}
@@ -150,8 +153,8 @@ def start_tests_for_consensus(consensus: str, transactions: int, rounds: int, no
         
         for i in range(1, number_of_nodes+1):
             xlsx_data[f'node-{i}'] = {}
-            xlsx_data[f'node-{i}']['memory'] = get_memory_usage(f'evoting_node-{i}_1', start, end)
-            xlsx_data[f'node-{i}']['cpu'] = get_10s_cpu_usage(f'evoting_node-{i}_1', start, end)
+            xlsx_data[f'node-{i}']['memory'] = get_memory_usage(f'{cont_prefix}node-{i}{cont_suffix}', start, end)
+            xlsx_data[f'node-{i}']['cpu'] = get_10s_cpu_usage(f'{cont_prefix}node-{i}{cont_suffix}', start, end)
 
         dump_data_to_xlsx(memory_workbook, cpu_workbook, xlsx_data)
 
@@ -162,8 +165,12 @@ def start_tests_for_consensus(consensus: str, transactions: int, rounds: int, no
 
 
 if __name__ == '__main__':
-    NUMBER_OF_ROUNDS = 1
-    NUMBER_OF_TRANSACTIONS = 100 # TODO: read this from CLI args
+    parser = argparse.ArgumentParser(description='Blockchain performance test suite')
+    parser.add_argument('-t', '--transactions', type=int, help='number of transactions submitted per round', default=1000)
+    parser.add_argument('-r', '--rounds', type=int, help='number of testing rounds', default=1)
+    
+    args = parser.parse_args()
+    NUMBER_OF_ROUNDS = args.rounds
+    NUMBER_OF_TRANSACTIONS = args.transactions
     start_tests_for_consensus(consensus='pbft', transactions=NUMBER_OF_TRANSACTIONS, rounds=NUMBER_OF_ROUNDS, node_address='http://localhost:2001', number_of_nodes=10)
-    # start_tests_for_consensus(consensus='pow',  transactions=NUMBER_OF_TRANSACTIONS, rounds=NUMBER_OF_ROUNDS, node_address='http://localhost:1337', number_of_nodes=3)
-    # TODO: fix pow tests
+    start_tests_for_consensus(consensus='pow',  transactions=NUMBER_OF_TRANSACTIONS, rounds=NUMBER_OF_ROUNDS, node_address='http://localhost:1337', number_of_nodes=3)
