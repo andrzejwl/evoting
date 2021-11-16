@@ -1,7 +1,7 @@
 import requests
 import time
 
-NUMBER_OF_TRANSACTIONS = 1000
+NUMBER_OF_TRANSACTIONS = 600
 NODE_ADDRESS = 'http://localhost:2001'
 CONSENSUS = 'pbft'
 

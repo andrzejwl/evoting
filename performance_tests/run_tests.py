@@ -4,9 +4,11 @@ import requests
 import subprocess
 import time
 import xlsxwriter
-from typing import Dict
+from typing import Dict, List
 from pathlib import Path
 from datetime import datetime
+
+from xlsxwriter.workbook import Workbook
 
 
 def get_containers(): 
@@ -79,6 +81,16 @@ def cpu_usage_percent(stats):
     return round(percentage, 2)
 
 
+def query_usage(query: str, name: str, start: int, end: int):
+    response = requests.get(f"http://localhost:9090/api/v1/query_range?query={query}{{name='{name}'}}&start={start}&end={end}&step=1")
+    if response.status_code != 200:
+        raise Exception(f'Failed to to fetch query data for {name}')
+    server_response = response.json()
+    try:
+        return server_response['data']['result'][0]['values']
+    except IndexError:
+        return server_response['data']['result']
+
 def get_memory_usage(name: str, start: int, end: int):
     response = requests.get(f"http://localhost:9090/api/v1/query_range?query=container_memory_usage_bytes{{name='{name}'}}&start={start}&end={end}&step=1")
     if response.status_code != 200:
@@ -101,68 +113,94 @@ def get_10s_cpu_usage(name: str, start: int, end: int):
         return server_response['data']['result']
 
 
-def dump_data_to_xlsx(memory_notebook: xlsxwriter.Workbook, cpu_notebook: xlsxwriter.Workbook, data: dict):
-    worksheet = memory_notebook.add_worksheet()
+def dump_data_to_xlsx(notebooks: Dict[str, xlsxwriter.Workbook], data: Dict):
     nodes = list(data.keys())
+    for label, notebook in notebooks.items():
+        worksheet = notebook.add_worksheet()
 
-    for col in range(len(nodes)):
-        node = nodes[col]
-        worksheet.write(0, col*3, node)
-        
-        row = 1
-        for ts, val in data[node]['memory']:
-            worksheet.write(row, col*3, ts)
-            worksheet.write(row, col*3+1, val)
-            row += 1
+        for col in range(len(nodes)):
+            node = nodes[col]
+            worksheet.write(0, col*3, node)
+            
+            row = 1
+            for ts, val in data[node][label]:
+                worksheet.write(row, col*3, ts)
+                worksheet.write(row, col*3+1, val)
+                row += 1
 
-    worksheet = cpu_notebook.add_worksheet()
-    for col in range(len(nodes)):
-        node = nodes[col]
-        worksheet.write(0, col*3, node)
-        
-        row = 1
-        for ts, val in data[node]['memory']:
-            worksheet.write(row, col*3, ts)
-            worksheet.write(row, col*3+1, val)
+
+def dump_round_data(notebook: xlsxwriter.Workbook, data: List):
+    params = list(data[0].keys())
+    row = 0
+    worksheet = notebook.add_worksheet()
+
+    for round in data:
+        for label, val in round.items():
+            worksheet.write(row, 0, label)
+            worksheet.write(row, 1, val)
             row += 1
+        row += 1
 
 
 def start_tests_for_consensus(consensus: str, transactions: int, rounds: int, node_address: str, number_of_nodes: int):
     """
     Runs tests in multiple rounds and dumps data to xlsx files.
     """
-    start = int(datetime.now().timestamp()) # API accepts integer timestamps
+    
     compose_file = 'compose-pow.yml' if consensus == 'pow' else 'docker-compose-py.yml'
     compose_path = Path.cwd().parent.absolute()
     start_compose(compose_path, compose_file)
     now = datetime.now()
-    filename = f'DATA_{now.strftime("%d_%m_%H-%M")}.xlsx'
-    memory_workbook = xlsxwriter.Workbook(filename='MEMORY_'+filename)
-    cpu_workbook = xlsxwriter.Workbook(filename='CPU_'+filename)
+    filename_base = f'data_{now.strftime("%d_%m_%H-%M")}.xlsx'
     cont_prefix = 'pow_' if consensus == 'pow' else 'evoting_'
     cont_suffix = '' if consensus == 'pow' else '_1'
+
+    queries = [
+        ('container_memory_usage_bytes', 'memory'), 
+        ('container_cpu_load_average_10s', 'cpu_10s'),
+        ('container_network_transmit_bytes_total', 'network_tx'),
+        ('container_network_receive_bytes_total', 'network_rcv'),
+    ]
+
+    notebooks = {}
+    rounds_data = []
+
+    for _, label in queries:
+        notebooks[label] = xlsxwriter.Workbook(filename=consensus+'_'+label+'_'+filename_base)
 
     for round in range(rounds):
         xlsx_data = {}
         restart_containers(Path.cwd().parent.absolute(), 'docker-compose-py.yml')
+        
         print('[INFO] starting round', round)
-        test_performance(transactions=transactions, node_address=node_address, consensus=consensus)
-        print('[INFO] round', round, 'done')
-        # get statisics for each round
+        
+        start = int(datetime.now().timestamp())
+        total_time: float = test_performance(transactions=transactions, node_address=node_address, consensus=consensus)
         end = int(datetime.now().timestamp())
+        
+        print('[INFO] round', round, 'done')
         
         for i in range(1, number_of_nodes+1):
             xlsx_data[f'node-{i}'] = {}
-            xlsx_data[f'node-{i}']['memory'] = get_memory_usage(f'{cont_prefix}node-{i}{cont_suffix}', start, end)
-            xlsx_data[f'node-{i}']['cpu'] = get_10s_cpu_usage(f'{cont_prefix}node-{i}{cont_suffix}', start, end)
+            cont_name = f'{cont_prefix}node-{i}{cont_suffix}'
+            for query, label in queries:
+                xlsx_data[f'node-{i}'][label] = query_usage(query, cont_name, start, end)
 
-        dump_data_to_xlsx(memory_workbook, cpu_workbook, xlsx_data)
+        dump_data_to_xlsx(notebooks, xlsx_data)
+        rounds_data.append({
+            'round_number': round+1,
+            'transactions': transactions,
+            'total_time': total_time,
+        })
 
-    memory_workbook.close()
-    cpu_workbook.close()
+    for _, nb in notebooks.items():
+        nb.close()
+
+    rounds_workbook = Workbook(consensus+'_rounds_'+filename_base)
+    dump_round_data(rounds_workbook, rounds_data)
+    rounds_workbook.close()
     close_compose(compose_path, compose_file)
     
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Blockchain performance test suite')
