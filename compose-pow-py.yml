@@ -1,0 +1,138 @@
+services:
+  node-1:
+    container_name: pow_node-1
+    entrypoint: ["/evoting", "-consensus=pow", "-root=true"]
+    environment:
+    - DOCKER=1
+    - HOSTNAME=node-1
+    - PORT=1337
+    image: evoting_node
+    ports:
+    - 1337:1337
+  node-10:
+    container_name: pow_node-10
+    depends_on:
+    - node-9
+    entrypoint: ["/evoting", "-consensus=pow"]
+    environment:
+    - DOCKER=1
+    - HOSTNAME=node-10
+    - PORT=1346
+    - PEER_HOSTNAME=node-1
+    - PEER_PORT=1337
+    image: evoting_node
+    ports:
+    - 1346:1346
+  node-2:
+    container_name: pow_node-2
+    depends_on:
+    - node-1
+    entrypoint: ["/evoting", "-consensus=pow"]
+    environment:
+    - DOCKER=1
+    - HOSTNAME=node-2
+    - PORT=1338
+    - PEER_HOSTNAME=node-1
+    - PEER_PORT=1337
+    image: evoting_node
+    ports:
+    - 1338:1338
+  node-3:
+    container_name: pow_node-3
+    depends_on:
+    - node-2
+    entrypoint: ["/evoting", "-consensus=pow"]
+    environment:
+    - DOCKER=1
+    - HOSTNAME=node-3
+    - PORT=1339
+    - PEER_HOSTNAME=node-1
+    - PEER_PORT=1337
+    image: evoting_node
+    ports:
+    - 1339:1339
+  node-4:
+    container_name: pow_node-4
+    depends_on:
+    - node-3
+    entrypoint: ["/evoting", "-consensus=pow"]
+    environment:
+    - DOCKER=1
+    - HOSTNAME=node-4
+    - PORT=1340
+    - PEER_HOSTNAME=node-1
+    - PEER_PORT=1337
+    image: evoting_node
+    ports:
+    - 1340:1340
+  node-5:
+    container_name: pow_node-5
+    depends_on:
+    - node-4
+    entrypoint: ["/evoting", "-consensus=pow"]
+    environment:
+    - DOCKER=1
+    - HOSTNAME=node-5
+    - PORT=1341
+    - PEER_HOSTNAME=node-1
+    - PEER_PORT=1337
+    image: evoting_node
+    ports:
+    - 1341:1341
+  node-6:
+    container_name: pow_node-6
+    depends_on:
+    - node-5
+    entrypoint: ["/evoting", "-consensus=pow"]
+    environment:
+    - DOCKER=1
+    - HOSTNAME=node-6
+    - PORT=1342
+    - PEER_HOSTNAME=node-1
+    - PEER_PORT=1337
+    image: evoting_node
+    ports:
+    - 1342:1342
+  node-7:
+    container_name: pow_node-7
+    depends_on:
+    - node-6
+    entrypoint: ["/evoting", "-consensus=pow"]
+    environment:
+    - DOCKER=1
+    - HOSTNAME=node-7
+    - PORT=1343
+    - PEER_HOSTNAME=node-1
+    - PEER_PORT=1337
+    image: evoting_node
+    ports:
+    - 1343:1343
+  node-8:
+    container_name: pow_node-8
+    depends_on:
+    - node-7
+    entrypoint: ["/evoting", "-consensus=pow"]
+    environment:
+    - DOCKER=1
+    - HOSTNAME=node-8
+    - PORT=1344
+    - PEER_HOSTNAME=node-1
+    - PEER_PORT=1337
+    image: evoting_node
+    ports:
+    - 1344:1344
+  node-9:
+    container_name: pow_node-9
+    depends_on:
+    - node-8
+    entrypoint: ["/evoting", "-consensus=pow"]
+    environment:
+    - DOCKER=1
+    - HOSTNAME=node-9
+    - PORT=1345
+    - PEER_HOSTNAME=node-1
+    - PEER_PORT=1337
+    image: evoting_node
+    ports:
+    - 1345:1345
+version: '3.9'

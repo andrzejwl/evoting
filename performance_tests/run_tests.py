@@ -22,7 +22,7 @@ def restart_containers(compose_path: str, compose_file: str):
 
 
 def start_compose(compose_path: str, compose_file: str):
-    process = subprocess.run(['docker-compose', '-f', compose_file, 'up', '-d'], cwd=compose_path, stdout=subprocess.DEVNULL)
+    process = subprocess.run(['docker-compose', '-f', compose_file, 'up', '-d', '--remove-orphans'], cwd=compose_path, stdout=subprocess.DEVNULL)
 
 
 def close_compose(compose_path: str, compose_file: str):
@@ -57,7 +57,7 @@ def test_performance(transactions: int, node_address: str, consensus: str)->floa
     parties = ["voting party 1", "voting party 2"]
     start = time.time()
     url = f'{node_address}/transaction/create' if consensus == 'pow' else f'{node_address}/new-request'
-    
+    print(url)
     for token in parties:
         for i in range(transactions//len(parties)):
             r = requests.post(url, json=body(consensus, i, token))
@@ -81,40 +81,54 @@ def cpu_usage_percent(stats):
     return round(percentage, 2)
 
 
-def query_usage(query: str, name: str, start: int, end: int):
-    response = requests.get(f"http://localhost:9090/api/v1/query_range?query={query}{{name='{name}'}}&start={start}&end={end}&step=1")
-    if response.status_code != 200:
-        raise Exception(f'Failed to to fetch query data for {name}')
-    server_response = response.json()
-    try:
-        return server_response['data']['result'][0]['values']
-    except IndexError:
-        return server_response['data']['result']
-
-def get_memory_usage(name: str, start: int, end: int):
-    response = requests.get(f"http://localhost:9090/api/v1/query_range?query=container_memory_usage_bytes{{name='{name}'}}&start={start}&end={end}&step=1")
-    if response.status_code != 200:
-        raise Exception(f'Failed to to fetch memory data for {name}')
-    server_response = response.json()
-    try:
-        return server_response['data']['result'][0]['values']
-    except IndexError:
-        return server_response['data']['result']
-
-def get_10s_cpu_usage(name: str, start: int, end: int):
-    response = requests.get(f"http://localhost:9090/api/v1/query_range?query=container_cpu_load_average_10s{{name='{name}'}}&start={start}&end={end}&step=1")
+def query_usage(query: str, image: str, start: int, end: int)->Dict:
+    """
+    Fetches data for all containers running the specified image.
+    """
+    response = requests.get(f"http://localhost:9090/api/v1/query_range?query={query}{{image='{image}'}}&start={start}&end={end}&step=1")
     if response.status_code != 200:
         print(response.json())
-        raise Exception(f'Failed to to fetch CPU data for {name}')
+        raise Exception(f'Failed to to fetch CPU data for {image}')
     server_response = response.json()
-    try:
-        return server_response['data']['result'][0]['values']
-    except IndexError:
-        return server_response['data']['result']
+
+    data = {}
+    for node in server_response['data']['result']:
+        data[node['metric']['name']] = node['values']
+    
+    return data
+
+
+# def get_memory_usage(image: str, start: int, end: int):
+#     response = requests.get(f"http://localhost:9090/api/v1/query_range?query=container_memory_usage_bytes{{image='{image}'}}&start={start}&end={end}&step=1")
+#     if response.status_code != 200:
+#         raise Exception(f'Failed to to fetch memory data for {image}')
+#     server_response = response.json()
+#     try:
+#         return server_response['data']['result'][0]['values']
+#     except IndexError:
+#         return server_response['data']['result']
+
+
+# def get_cpu_secs_sum(image: str, start: int, end: int):
+#     """
+#     Fetches data for all containers running the specified image.
+#     """
+#     response = requests.get(f"http://localhost:9090/api/v1/query_range?query=container_cpu_usage_seconds_total{{image='{image}'}}&start={start}&end={end}&step=1")
+#     if response.status_code != 200:
+#         print(response.json())
+#         raise Exception(f'Failed to to fetch CPU data for {image}')
+#     server_response = response.json()
+
+#     data = {}
+#     for node in server_response['data']['result']:
+#         data[node['metric']['name']] = node['values']
+    
+#     return data
 
 
 def dump_data_to_xlsx(notebooks: Dict[str, xlsxwriter.Workbook], data: Dict):
-    nodes = list(data.keys())
+    labels = list(data.keys())
+    nodes = list(data[labels[0]].keys())
     for label, notebook in notebooks.items():
         worksheet = notebook.add_worksheet()
 
@@ -123,9 +137,9 @@ def dump_data_to_xlsx(notebooks: Dict[str, xlsxwriter.Workbook], data: Dict):
             worksheet.write(0, col*3, node)
             
             row = 1
-            for ts, val in data[node][label]:
+            for ts, val in data[label][node]:
                 worksheet.write(row, col*3, ts)
-                worksheet.write(row, col*3+1, val)
+                worksheet.write(row, col*3+1, float(val))
                 row += 1
 
 
@@ -147,17 +161,18 @@ def start_tests_for_consensus(consensus: str, transactions: int, rounds: int, no
     Runs tests in multiple rounds and dumps data to xlsx files.
     """
     
-    compose_file = 'compose-pow.yml' if consensus == 'pow' else 'docker-compose-py.yml'
+    compose_file = 'compose-pow-py.yml' if consensus == 'pow' else 'docker-compose-py.yml'
     compose_path = Path.cwd().parent.absolute()
     start_compose(compose_path, compose_file)
     now = datetime.now()
     filename_base = f'data_{now.strftime("%d_%m_%H-%M")}.xlsx'
-    cont_prefix = 'pow_' if consensus == 'pow' else 'evoting_'
-    cont_suffix = '' if consensus == 'pow' else '_1'
+    # cont_prefix = 'pow_' if consensus == 'pow' else 'evoting_'
+    # cont_suffix = '' if consensus == 'pow' else '_1'
+    image_name = 'evoting_node'
 
     queries = [
         ('container_memory_usage_bytes', 'memory'), 
-        ('container_cpu_load_average_10s', 'cpu_10s'),
+        ('container_cpu_usage_seconds_total', 'cpu_time'),
         ('container_network_transmit_bytes_total', 'network_tx'),
         ('container_network_receive_bytes_total', 'network_rcv'),
     ]
@@ -179,12 +194,9 @@ def start_tests_for_consensus(consensus: str, transactions: int, rounds: int, no
         end = int(datetime.now().timestamp())
         
         print('[INFO] round', round, 'done')
-        
-        for i in range(1, number_of_nodes+1):
-            xlsx_data[f'node-{i}'] = {}
-            cont_name = f'{cont_prefix}node-{i}{cont_suffix}'
-            for query, label in queries:
-                xlsx_data[f'node-{i}'][label] = query_usage(query, cont_name, start, end)
+
+        for query, label in queries:
+            xlsx_data[label] = query_usage(query, image_name, start, end)
 
         dump_data_to_xlsx(notebooks, xlsx_data)
         rounds_data.append({
@@ -211,4 +223,4 @@ if __name__ == '__main__':
     NUMBER_OF_ROUNDS = args.rounds
     NUMBER_OF_TRANSACTIONS = args.transactions
     start_tests_for_consensus(consensus='pbft', transactions=NUMBER_OF_TRANSACTIONS, rounds=NUMBER_OF_ROUNDS, node_address='http://localhost:2001', number_of_nodes=10)
-    start_tests_for_consensus(consensus='pow',  transactions=NUMBER_OF_TRANSACTIONS, rounds=NUMBER_OF_ROUNDS, node_address='http://localhost:1337', number_of_nodes=3)
+    start_tests_for_consensus(consensus='pow',  transactions=NUMBER_OF_TRANSACTIONS, rounds=NUMBER_OF_ROUNDS, node_address='http://localhost:1337', number_of_nodes=10)
