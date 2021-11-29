@@ -57,7 +57,7 @@ def test_performance(transactions: int, node_address: str, consensus: str)->floa
     parties = ["voting party 1", "voting party 2"]
     start = time.time()
     url = f'{node_address}/transaction/create' if consensus == 'pow' else f'{node_address}/new-request'
-    print(url)
+
     for token in parties:
         for i in range(transactions//len(parties)):
             r = requests.post(url, json=body(consensus, i, token))
@@ -93,8 +93,12 @@ def query_usage(query: str, image: str, start: int, end: int)->Dict:
 
     data = {}
     for node in server_response['data']['result']:
-        data[node['metric']['name']] = node['values']
+        if node['metric']['name'] not in data.keys():
+            data[node['metric']['name']] = node['values']
     
+    if query in ('container_network_transmit_bytes_total', 'container_network_receive_bytes_total'):
+        print(f"http://localhost:9090/api/v1/query_range?query={query}{{image='{image}'}}&start={start}&end={end}&step=1")
+
     return data
 
 
