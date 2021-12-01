@@ -68,7 +68,6 @@ func (bc *Blockchain) AddTransaction(t Transaction) string {
 func (bc *Blockchain) ValidateTransactions() {
 	// validate pending transactions and append them to the blockchain
 	bc.Update(false)
-
 	newBlock := Block{}
 	lastBlock := bc.LastBlock()
 
@@ -89,6 +88,7 @@ func (bc *Blockchain) ValidateTransactions() {
 	} else {
 		newBlock.Timestamp = int(time.Now().Unix())
 	}
+
 	newBlock.ProofOfWork(bc.Difficulty)
 	bc.Chain = append(bc.Chain, newBlock)
 	bc.blockHashes = append(bc.blockHashes, calculateHash(newBlock))
@@ -97,7 +97,7 @@ func (bc *Blockchain) ValidateTransactions() {
 
 func (bc *Blockchain) HttpGetChain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Println("GET /chain Request from:", r.RemoteAddr)
+	// fmt.Println("GET /chain Request from:", r.RemoteAddr)
 	json.NewEncoder(w).Encode(bc)
 }
 
@@ -110,8 +110,10 @@ func (bc *Blockchain) HttpCreateTransaction(w http.ResponseWriter, r *http.Reque
 		http.Error(w, error.Error(), http.StatusBadRequest)
 		return
 	}
-	bc.Update(false)
+
+	// bc.Update called inside of bc.ValidateTransactions
 	bc.AddTransaction(t)
+
 	// in the future ValidateTransactions should not be called separately for each transaction
 	// might need to add a database to store the transactions in
 	bc.ValidateTransactions()
@@ -227,6 +229,22 @@ func (bc *Blockchain) HttpRegisterPeer(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, `{"detail": "ok"}`)
 }
 
+func PropagateRequest(url string, bodyBytes []byte) {
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(bodyBytes))
+
+	if err != nil {
+		fmt.Println("[ERR] Propagation failed to", url, ", error:", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, respErr := ioutil.ReadAll(resp.Body)
+		if respErr != nil {
+			fmt.Println("[ERR]", respErr.Error())
+		}
+		fmt.Println("[ERR] Response from", url, ": status code:", resp.StatusCode, ", response:", string(body))
+	}
+}
+
 func (bc Blockchain) PropagateChain() {
 	bcBuffer, jsonErr := json.Marshal(bc)
 
@@ -236,20 +254,10 @@ func (bc Blockchain) PropagateChain() {
 	}
 
 	for _, peer := range bc.Peers {
-		fmt.Println("Propagating to", peer)
-		resp, err := http.Post(fmt.Sprintf("http://%v/update", peer.String()), "application/json", bytes.NewBuffer(bcBuffer))
+		// fmt.Println("Propagating to", peer)
+		url := fmt.Sprintf("http://%v/update", peer.String())
 
-		if err != nil {
-			fmt.Println("[ERR] Propagation failed to", peer, ", error:", err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			body, respErr := ioutil.ReadAll(resp.Body)
-			if respErr != nil {
-				fmt.Println("[ERR]", respErr.Error())
-			}
-			fmt.Println("[ERR] Response from", peer, ": status code:", resp.StatusCode, ", response:", string(body))
-		}
+		go PropagateRequest(url, bcBuffer)
 	}
 }
 
