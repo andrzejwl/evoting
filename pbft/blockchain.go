@@ -237,7 +237,7 @@ func (bc Blockchain) SignMessage(message string) string {
 
 func (bc *Blockchain) HttpGetChain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Println("GET /chain Request from:", r.RemoteAddr)
+	// fmt.Println("GET /chain Request from:", r.RemoteAddr)
 	json.NewEncoder(w).Encode(bc)
 }
 
