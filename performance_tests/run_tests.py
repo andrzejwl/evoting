@@ -136,14 +136,16 @@ def dump_data_to_xlsx(notebooks: Dict[str, xlsxwriter.Workbook], data: Dict):
     for label, notebook in notebooks.items():
         worksheet = notebook.add_worksheet()
 
-        for col in range(len(nodes)):
-            node = nodes[col]
-            worksheet.write(0, col*3, node)
-            
-            row = 1
+        worksheet.write(0, 0, 'node_name')
+        worksheet.write(0, 1, 'timestamp')
+        worksheet.write(0, 2, 'value')
+
+        row = 1
+        for node in nodes:
             for ts, val in data[label][node]:
-                worksheet.write(row, col*3, ts)
-                worksheet.write(row, col*3+1, float(val))
+                worksheet.write(row, 0, node)
+                worksheet.write(row, 1, ts)
+                worksheet.write(row, 2, float(val))
                 row += 1
 
 
