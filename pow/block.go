@@ -7,15 +7,15 @@ import (
 )
 
 type Block struct {
-	Timestamp         int           `json: "timestamp"`
-	Nonce             int           `json: "nonce"`
-	Transactions      []Transaction `json: "transactions"`
-	PreviousBlockHash string        `json: "previousHash"`
+	Timestamp         int           `json:"timestamp"`
+	Nonce             int           `json:"nonce"`
+	Transactions      []Transaction `json:"transactions"`
+	PreviousBlockHash string        `json:"previousHash"`
 }
 
 func calculateHash(block Block) string {
 	hash := sha256.New()
-	hash.Write([]byte(fmt.Sprint("%v", block)))
+	hash.Write([]byte(fmt.Sprintf("%v", block)))
 
 	return fmt.Sprintf("%x", hash.Sum(nil)) // return string representing hex formatted hash
 }
