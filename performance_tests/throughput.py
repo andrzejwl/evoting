@@ -1,5 +1,7 @@
 import requests
 import time
+import random
+
 
 NUMBER_OF_TRANSACTIONS = 600
 NODE_ADDRESS = 'http://localhost:2001'
@@ -27,12 +29,13 @@ def body(consensus, i, toId = None):
 
 
 if __name__ == '__main__':
-    parties = ["voting party 1", "voting party 2"]
+    parties = ["voting party 1", "voting party 2", "voting party 3"]
     start = time.time()
     url = f'{NODE_ADDRESS}/transaction/create' if CONSENSUS == 'pow' else f'{NODE_ADDRESS}/new-request'
     
     for token in parties:
-        for i in range(NUMBER_OF_TRANSACTIONS//len(parties)):
+        num_votes = random.randint(100, 200)
+        for i in range(num_votes):
             r = requests.post(url, json=body(CONSENSUS, i, token))
     end = time.time()
 

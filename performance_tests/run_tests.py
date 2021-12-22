@@ -96,38 +96,7 @@ def query_usage(query: str, image: str, start: int, end: int)->Dict:
         if node['metric']['name'] not in data.keys():
             data[node['metric']['name']] = node['values']
     
-    if query in ('container_network_transmit_bytes_total', 'container_network_receive_bytes_total'):
-        print(f"http://localhost:9090/api/v1/query_range?query={query}{{image='{image}'}}&start={start}&end={end}&step=1")
-
     return data
-
-
-# def get_memory_usage(image: str, start: int, end: int):
-#     response = requests.get(f"http://localhost:9090/api/v1/query_range?query=container_memory_usage_bytes{{image='{image}'}}&start={start}&end={end}&step=1")
-#     if response.status_code != 200:
-#         raise Exception(f'Failed to to fetch memory data for {image}')
-#     server_response = response.json()
-#     try:
-#         return server_response['data']['result'][0]['values']
-#     except IndexError:
-#         return server_response['data']['result']
-
-
-# def get_cpu_secs_sum(image: str, start: int, end: int):
-#     """
-#     Fetches data for all containers running the specified image.
-#     """
-#     response = requests.get(f"http://localhost:9090/api/v1/query_range?query=container_cpu_usage_seconds_total{{image='{image}'}}&start={start}&end={end}&step=1")
-#     if response.status_code != 200:
-#         print(response.json())
-#         raise Exception(f'Failed to to fetch CPU data for {image}')
-#     server_response = response.json()
-
-#     data = {}
-#     for node in server_response['data']['result']:
-#         data[node['metric']['name']] = node['values']
-    
-#     return data
 
 
 def dump_data_to_xlsx(notebooks: Dict[str, xlsxwriter.Workbook], data: Dict):
@@ -151,14 +120,15 @@ def dump_data_to_xlsx(notebooks: Dict[str, xlsxwriter.Workbook], data: Dict):
 
 def dump_round_data(notebook: xlsxwriter.Workbook, data: List):
     params = list(data[0].keys())
-    row = 0
+    row = 1
     worksheet = notebook.add_worksheet()
 
+    for i, p in enumerate(params):
+        worksheet.write(0, i, p)
+
     for round in data:
-        for label, val in round.items():
-            worksheet.write(row, 0, label)
-            worksheet.write(row, 1, val)
-            row += 1
+        for i, val in enumerate(list(round.values())):
+            worksheet.write(row, i, val)
         row += 1
 
 
@@ -167,11 +137,13 @@ def start_tests_for_consensus(consensus: str, transactions: int, rounds: int, no
     Runs tests in multiple rounds and dumps data to xlsx files.
     """
     
-    compose_file = 'compose-pow-py.yml' if consensus == 'pow' else 'docker-compose-py.yml'
+    # compose_file = 'compose-pow-py.yml' if consensus == 'pow' else 'docker-compose-py.yml'
+    compose_file = 'compose-pow-py.yml' if consensus == 'pow' else 'compose-20.yml'
     compose_path = Path.cwd().parent.absolute()
     start_compose(compose_path, compose_file)
     now = datetime.now()
-    filename_base = f'data_{now.strftime("%d_%m_%H-%M")}.xlsx'
+    # filename_base = f'data_{now.strftime("%d_%m_%H-%M")}.xlsx'
+    filename_base = '.xlsx'
     # cont_prefix = 'pow_' if consensus == 'pow' else 'evoting_'
     # cont_suffix = '' if consensus == 'pow' else '_1'
     image_name = 'evoting_node'
@@ -187,19 +159,19 @@ def start_tests_for_consensus(consensus: str, transactions: int, rounds: int, no
     rounds_data = []
 
     for _, label in queries:
-        notebooks[label] = xlsxwriter.Workbook(filename=consensus+'_'+label+'_'+filename_base)
+        notebooks[label] = xlsxwriter.Workbook(filename=consensus+'_20_nodes_'+label+filename_base)
 
     for round in range(rounds):
         xlsx_data = {}
-        restart_containers(Path.cwd().parent.absolute(), 'docker-compose-py.yml')
+        restart_containers(Path.cwd().parent.absolute(), compose_file)
         
-        print('[INFO] starting round', round)
+        print('[INFO] starting round', round+1)
         
         start = int(datetime.now().timestamp())
         total_time: float = test_performance(transactions=transactions, node_address=node_address, consensus=consensus)
         end = int(datetime.now().timestamp())
         
-        print('[INFO] round', round, 'done')
+        print('[INFO] round', round+1, 'done')
 
         for query, label in queries:
             xlsx_data[label] = query_usage(query, image_name, start, end)
@@ -214,7 +186,7 @@ def start_tests_for_consensus(consensus: str, transactions: int, rounds: int, no
     for _, nb in notebooks.items():
         nb.close()
 
-    rounds_workbook = Workbook(consensus+'_rounds_'+filename_base)
+    rounds_workbook = Workbook(consensus+'_rounds'+filename_base)
     dump_round_data(rounds_workbook, rounds_data)
     rounds_workbook.close()
     close_compose(compose_path, compose_file)
@@ -229,4 +201,4 @@ if __name__ == '__main__':
     NUMBER_OF_ROUNDS = args.rounds
     NUMBER_OF_TRANSACTIONS = args.transactions
     start_tests_for_consensus(consensus='pbft', transactions=NUMBER_OF_TRANSACTIONS, rounds=NUMBER_OF_ROUNDS, node_address='http://localhost:2001', number_of_nodes=10)
-    start_tests_for_consensus(consensus='pow',  transactions=NUMBER_OF_TRANSACTIONS, rounds=NUMBER_OF_ROUNDS, node_address='http://localhost:1337', number_of_nodes=10)
+    # start_tests_for_consensus(consensus='pow',  transactions=NUMBER_OF_TRANSACTIONS, rounds=NUMBER_OF_ROUNDS, node_address='http://localhost:1337', number_of_nodes=10)
