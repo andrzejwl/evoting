@@ -15,3 +15,7 @@ evoting
 # Dependency directories (remove the comment below to include it)
 # vendor/
 *.xlsx
+data*
+
+# Remove the data analysis notebook, keep a PDF instead
+*.ipynb
